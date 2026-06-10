@@ -6,6 +6,7 @@
 <title>Générateur RGPD — TPE/PME Françaises</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root {
     --blue: #2563EB;
@@ -1517,7 +1518,6 @@ function genDoc1(info, today) {
     const soustraitants = escHtml(d.sous_traitants?.value || fiche.sous_traitants_types || '');
     return `<tr>
       <td><strong>${escHtml(fiche.nom || label)}</strong></td>
-      <td>${escHtml(info.raisonSociale)}<br><small>${escHtml(info.responsableLegal)}</small></td>
       <td>${escHtml(d.finalite?.value || fiche.finalite || '')}</td>
       <td>${escHtml(d.base_legale?.value || fiche.base_legale || '')}</td>
       <td>${escHtml(d.personnes_concernees?.value || fiche.personnes_concernees || '')}</td>
@@ -1543,11 +1543,11 @@ function genDoc1(info, today) {
       <br>
       <table class="doc-table">
         <thead><tr>
-          <th>Traitement</th><th>Responsable</th><th>Finalité</th><th>Base légale</th>
+          <th>Traitement</th><th>Finalité</th><th>Base légale</th>
           <th>Personnes concernées</th><th>Catégories de données</th><th>Destinataires</th>
           <th>Sous-traitants (Art. 30)</th><th>Transfert hors UE</th><th>Durée de conservation</th><th>Mesures de sécurité</th>
         </tr></thead>
-        <tbody>${rows || '<tr><td colspan="11" style="text-align:center;color:var(--gray-text)">Aucun traitement sélectionné</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:var(--gray-text)">Aucun traitement sélectionné</td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
@@ -1783,90 +1783,45 @@ async function exportPDF() {
 
   try {
     const { jsPDF } = window.jspdf;
-    const margin = 10;
-    const docs = [
-      { id: 'doc1content', orient: 'l', nom: '1_Registre_traitements' },
+    const info = getFormData();
+    const base = info.raisonSociale.replace(/[^a-zA-Z0-9]/g, '_');
+    const date = formatDateFile(new Date());
+    const today = formatDate(new Date());
+
+    // ── DOC 1 : Registre avec autoTable (vrai tableau PDF) ──────────────────
+    await exportDoc1AutoTable(jsPDF, info, today, base, date);
+    await new Promise(r => setTimeout(r, 300));
+
+    // ── DOCS 2, 3, 4 : html2canvas ──────────────────────────────────────────
+    const htmlDocs = [
       { id: 'doc2content', orient: 'p', nom: '2_Politique_confidentialite' },
       { id: 'doc3content', orient: 'p', nom: '3_Procedure_violations' },
       { id: 'doc4content', orient: 'p', nom: '4_Mentions_legales' },
     ];
-
-    const info = getFormData();
-    const base = info.raisonSociale.replace(/[^a-zA-Z0-9]/g, '_');
-    const date = formatDateFile(new Date());
-
-    for (let i = 0; i < docs.length; i++) {
-      const { id, orient, nom } = docs[i];
+    for (const { id, orient, nom } of htmlDocs) {
       const el = document.getElementById(id);
       if (!el) continue;
-
-      const isTable = i === 0;
-
-      // Neutraliser les overflow + forcer word-break
+      const margin = 12;
       const allEls = [el, ...el.querySelectorAll('*')];
-      const saved = allEls.map(e => ({
-        e,
-        ov: e.style.overflow, ox: e.style.overflowX,
-        wb: e.style.wordBreak, ww: e.style.whiteSpace
-      }));
-      allEls.forEach(e => {
-        e.style.overflow = 'visible';
-        e.style.overflowX = 'visible';
-        e.style.wordBreak = 'break-word';
-      });
-
-      // Tableau : réduire police + padding pour tenir sur la largeur paysage
-      const tableEl = el.querySelector('.doc-table');
-      const savedFont = tableEl ? tableEl.style.fontSize : null;
-      const savedCells = [];
-      if (isTable && tableEl) {
-        tableEl.style.fontSize = '7.5px';
-        tableEl.querySelectorAll('th, td').forEach(c => {
-          savedCells.push({ c, p: c.style.padding, wb: c.style.wordBreak });
-          c.style.padding = '3px 4px';
-          c.style.wordBreak = 'break-word';
-        });
-      }
-
-      const renderW = isTable ? 1100 : 900;
+      const saved = allEls.map(e => ({ e, ov: e.style.overflow, ox: e.style.overflowX, wb: e.style.wordBreak }));
+      allEls.forEach(e => { e.style.overflow = 'visible'; e.style.overflowX = 'visible'; e.style.wordBreak = 'break-word'; });
       const canvas = await html2canvas(el, {
-        scale: 1.5, useCORS: true, logging: false,
-        scrollX: 0, scrollY: -window.scrollY,
-        windowWidth: renderW,
+        scale: 2, useCORS: true, logging: false,
+        scrollX: 0, scrollY: -window.scrollY, windowWidth: 900,
         onclone: (cloneDoc) => {
-          // Dans le clone, s'assurer que tout est visible
-          cloneDoc.querySelectorAll('*').forEach(e => {
-            e.style.overflow = 'visible';
-            e.style.maxHeight = 'none';
-            e.style.height = 'auto';
-          });
+          cloneDoc.querySelectorAll('*').forEach(e => { e.style.overflow = 'visible'; e.style.maxHeight = 'none'; e.style.height = 'auto'; });
         }
       });
-
-      // Restaurer
-      saved.forEach(({ e, ov, ox, wb, ww }) => {
-        e.style.overflow = ov;
-        e.style.overflowX = ox;
-        e.style.wordBreak = wb;
-        e.style.whiteSpace = ww;
-      });
-      if (isTable && tableEl) {
-        if (savedFont !== null) tableEl.style.fontSize = savedFont;
-        savedCells.forEach(({ c, p, wb }) => { c.style.padding = p; c.style.wordBreak = wb; });
-      }
-
-      // Créer un PDF individuel pour ce document
+      saved.forEach(({ e, ov, ox, wb }) => { e.style.overflow = ov; e.style.overflowX = ox; e.style.wordBreak = wb; });
       const pdf = new jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
       const pgW = pdf.internal.pageSize.getWidth();
       const pgH = pdf.internal.pageSize.getHeight();
       const usableW = pgW - margin * 2;
       const usableH = pgH - margin * 2;
-
       const imgW = usableW;
       const imgH = (canvas.height * imgW) / canvas.width;
-
       if (imgH <= usableH) {
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, imgH);
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgW, imgH);
       } else {
         const pxPerMm = canvas.width / imgW;
         const slicePx = Math.floor(usableH * pxPerMm);
@@ -1874,26 +1829,128 @@ async function exportPDF() {
         while (srcY < canvas.height) {
           const h = Math.min(slicePx, canvas.height - srcY);
           const slice = document.createElement('canvas');
-          slice.width = canvas.width;
-          slice.height = h;
+          slice.width = canvas.width; slice.height = h;
           slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h);
-          pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, h / pxPerMm);
+          pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, imgW, h / pxPerMm);
           srcY += h;
           if (srcY < canvas.height) pdf.addPage('a4', orient);
         }
       }
-
-      // Petit délai entre chaque téléchargement pour éviter le blocage navigateur
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 300));
       pdf.save('RGPD_' + base + '_' + nom + '_' + date + '.pdf');
-    } // fin for
+    }
+
   } catch(e) {
     alert('Erreur lors de la génération PDF : ' + e.message);
+    console.error(e);
   } finally {
     noPdfEls.forEach(el => el.style.display = '');
     btn.disabled = false;
     btn.textContent = '⬇️ Exporter en 4 PDF séparés';
   }
+}
+
+function exportDoc1AutoTable(jsPDF, info, today, base, date) {
+  const pdf = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
+  const W = pdf.internal.pageSize.getWidth(); // 297mm
+
+  // ── En-tête ──
+  pdf.setFillColor(30, 64, 175);
+  pdf.rect(0, 0, W, 22, 'F');
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(13);
+  pdf.text('REGISTRE DES ACTIVITÉS DE TRAITEMENT — Art. 30 RGPD', W / 2, 10, { align: 'center' });
+  pdf.setFontSize(9);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text(info.raisonSociale + ' — ' + info.formeJuridique + ' — SIRET : ' + info.siret, W / 2, 17, { align: 'center' });
+  pdf.setTextColor(50, 50, 50);
+
+  // ── Sous-en-tête ──
+  let y = 27;
+  pdf.setFontSize(8.5);
+  pdf.setFont('helvetica', 'normal');
+  pdf.text('Responsable du traitement : ' + info.responsableLegal + ' — ' + info.emailRGPD, 12, y);
+  y += 5;
+  if (info.hasDpo) { pdf.text('DPO : ' + info.dpoNom + ' — ' + info.dpoEmail, 12, y); y += 5; }
+  pdf.setTextColor(120, 120, 120);
+  pdf.text('Version 1.0 — ' + today, 12, y);
+  pdf.setTextColor(50, 50, 50);
+  y += 4;
+
+  // ── Données du tableau ──
+  const head = [['Traitement', 'Finalité', 'Base légale', 'Personnes concernées', 'Catégories de données', 'Destinataires', 'Sous-traitants (Art. 30)', 'Transfert hors UE', 'Durée de conservation', 'Mesures de sécurité']];
+  const body = Object.entries(treatmentData).map(([id, d]) => {
+    const fiche = CNIL_FICHES[id] || {};
+    const label = TREATMENTS_LIST.find(t => t.id === id)?.label || id;
+    const transfert = (d.transfert_hors_ue?.value || 'non') === 'oui'
+      ? 'Oui\n' + (d.transfert_detail?.value || fiche.transfert_detail || '')
+      : 'Non (UE)';
+    return [
+      fiche.nom || label,
+      d.finalite?.value || fiche.finalite || '',
+      d.base_legale?.value || fiche.base_legale || '',
+      d.personnes_concernees?.value || fiche.personnes_concernees || '',
+      d.categories_donnees?.value || fiche.categories_donnees || '',
+      d.destinataires?.value || fiche.destinataires || '',
+      d.sous_traitants?.value || fiche.sous_traitants_types || 'Aucun',
+      transfert,
+      d.duree_conservation?.value || fiche.duree_conservation || '',
+      getSecMesures(info.securite)
+    ];
+  });
+
+  pdf.autoTable({
+    startY: y,
+    head: head,
+    body: body,
+    styles: {
+      fontSize: 7.5,
+      cellPadding: { top: 3, right: 3, bottom: 3, left: 3 },
+      overflow: 'linebreak',
+      valign: 'top',
+      lineColor: [210, 220, 235],
+      lineWidth: 0.2,
+      textColor: [40, 40, 40]
+    },
+    headStyles: {
+      fillColor: [30, 64, 175],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 7.5,
+      halign: 'center',
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 }
+    },
+    alternateRowStyles: { fillColor: [245, 247, 252] },
+    columnStyles: {
+      0: { cellWidth: 28, fontStyle: 'bold' },
+      1: { cellWidth: 36 },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 28 },
+      6: { cellWidth: 28 },
+      7: { cellWidth: 20 },
+      8: { cellWidth: 28 },
+      9: { cellWidth: 30 }
+    },
+    margin: { left: 10, right: 10 },
+    didDrawPage: (data) => {
+      const pg = pdf.internal.getCurrentPageInfo().pageNumber;
+      const tot = pdf.internal.getNumberOfPages();
+      pdf.setFontSize(7);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text('Page ' + pg + ' / ' + tot + ' — Document confidentiel — ' + info.raisonSociale, W / 2, pdf.internal.pageSize.getHeight() - 5, { align: 'center' });
+      pdf.setTextColor(50, 50, 50);
+    }
+  });
+
+  return new Promise(resolve => {
+    setTimeout(() => {
+      pdf.save('RGPD_' + base + '_1_Registre_traitements_' + date + '.pdf');
+      resolve();
+    }, 100);
+  });
 }
 
 function copyDoc(id) {
