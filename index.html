@@ -320,7 +320,7 @@
         </div>
         <div class="field">
           <label>Forme juridique</label>
-          <select onchange="document.getElementById('formeJuridique').value=this.value">
+          <select id="formeJuridiqueSelect" onchange="document.getElementById('formeJuridique').value=this.value; onFormeJuridiqueChange(this.value)">
             <option value="">-- Sélectionner --</option>
             <option value="SARL">SARL</option><option value="SAS">SAS</option><option value="SASU">SASU</option>
             <option value="EURL">EURL</option><option value="EI">Entreprise individuelle (EI)</option>
@@ -378,8 +378,9 @@
         <input type="text" id="hebergeur" placeholder="Ex : OVH SAS — 2 rue Kellermann — 59100 Roubaix">
       </div>
       <div class="field">
-        <label>Capital social <span style="font-size:.8rem;color:var(--gray-text)">(obligatoire pour SARL/SAS/SA)</span></label>
+        <label>Capital social <span id="capitalSocialAsterisque" style="display:none;color:var(--red)"> *</span><span id="capitalSocialHint" style="font-size:.8rem;color:var(--gray-text)"> (obligatoire pour SARL/SAS/SA/EURL/SASU)</span></label>
         <input type="text" id="capitalSocial" placeholder="Ex : 10 000 €">
+        <div class="error-msg hidden" id="err_capitalSocial">Capital social obligatoire pour votre forme juridique</div>
       </div>
     </div>
   </div>
@@ -1076,6 +1077,9 @@ function selectSuggestion(idx) {
   if (fj) {
     const sel = document.getElementById('formeJuridique');
     for (let opt of sel.options) { if (opt.value === fj) { sel.value = fj; break; } }
+    const selVisible = document.getElementById('formeJuridiqueSelect');
+    if (selVisible) { selVisible.value = fj; }
+    onFormeJuridiqueChange(fj);
   }
 
   // L'API retourne maintenant un champ adresse unique
@@ -1242,6 +1246,17 @@ function validateStep1() {
     emailEl.classList.remove('error'); emailErr.classList.add('hidden');
   }
 
+  // Capital social obligatoire pour sociétés avec capital
+  if (capitalRequired()) {
+    const capEl = document.getElementById('capitalSocial');
+    const capErr = document.getElementById('err_capitalSocial');
+    if (!capEl.value.trim()) {
+      capEl.classList.add('error'); capErr.classList.remove('hidden'); valid = false;
+    } else {
+      capEl.classList.remove('error'); capErr.classList.add('hidden');
+    }
+  }
+
   // DPO obligatoire si secteur sensible
   if (checkDpoRequired() && document.getElementById('dpoNon').checked) {
     const msgEl = document.getElementById('dpoRequiredMsg');
@@ -1250,6 +1265,25 @@ function validateStep1() {
     valid = false;
   }
   return valid;
+}
+
+// ==================== CAPITAL SOCIAL ====================
+const FORMES_AVEC_CAPITAL = ['SARL','SAS','SASU','EURL','SA','SNC'];
+
+function capitalRequired() {
+  const fj = document.getElementById('formeJuridique')?.value || '';
+  return FORMES_AVEC_CAPITAL.includes(fj);
+}
+
+function onFormeJuridiqueChange(val) {
+  const required = FORMES_AVEC_CAPITAL.includes(val);
+  document.getElementById('capitalSocialAsterisque').style.display = required ? 'inline' : 'none';
+  document.getElementById('capitalSocialHint').style.display = required ? 'none' : 'inline';
+  // Effacer l'erreur si la forme change
+  if (required) {
+    document.getElementById('err_capitalSocial').classList.add('hidden');
+    document.getElementById('capitalSocial').classList.remove('error');
+  }
 }
 
 // ==================== SECTEUR ====================
