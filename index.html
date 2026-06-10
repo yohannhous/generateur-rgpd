@@ -784,9 +784,14 @@ async function generateWithAI(treatId, field, btnEl) {
   const fieldLabels = { finalite: 'finalité', base_legale: 'base légale', duree_conservation: 'durée de conservation', destinataires: 'destinataires des données', personnes_concernees: 'personnes concernées', categories_donnees: 'catégories de données', sous_traitants: 'sous-traitants impliqués' };
   const outilsListe = info.outilsListe || 'aucun outil spécifié';
 
+  const outilsAutres = info.outilsAutres || '';
+
   let fieldInstruction = '';
   if (field === 'sous_traitants') {
-    fieldInstruction = `Liste uniquement les sous-traitants pertinents pour ce traitement parmi : ${outilsListe}. Si aucun n'est pertinent, indique les outils typiques pour ce secteur. Noms séparés par des virgules, 1 ligne max, pas d'explication.`;
+    const autresInstruction = outilsAutres
+      ? `\nOutils supplémentaires saisis : "${outilsAutres}". Identifie d'abord la nature de chacun (ex: Shopify = e-commerce, Klaviyo = email marketing, Zendesk = support client), puis inclus-les seulement s'ils sont pertinents pour ce traitement spécifique.`
+      : '';
+    fieldInstruction = `Liste les sous-traitants pertinents pour le traitement "${fiche.nom || label}" parmi les outils connus : ${outilsListe}.${autresInstruction}\nRéponds uniquement avec les noms séparés par des virgules, 1 ligne max, pas d'explication.`;
   } else if (field === 'base_legale') {
     fieldInstruction = `Réponds UNIQUEMENT avec le nom de la base légale et l'article RGPD entre parenthèses. Exemple : "Exécution du contrat (Art. 6.1.b RGPD)". 1 ligne, pas d'explication.`;
   } else if (['personnes_concernees', 'categories_donnees'].includes(field)) {
@@ -1498,6 +1503,7 @@ function getFormData() {
     emailRGPD: v('emailRGPD'),
     outilsAmericains: document.getElementById('outil_google')?.checked || document.getElementById('outil_microsoft')?.checked || document.getElementById('outil_stripe')?.checked || document.getElementById('outil_mailchimp')?.checked || document.getElementById('outil_crm')?.checked || document.getElementById('outil_analytics')?.checked || false,
     outilsListe: getOutilsListe(),
+    outilsAutres: document.getElementById('outilsAutres')?.value.trim() || '',
     hebergeur: v('hebergeur'),
     capitalSocial: v('capitalSocial'),
     hasDpo: dpoOui,
