@@ -1732,8 +1732,8 @@ ${info.capitalSocial ? `<strong>Capital social :</strong> ${escHtml(info.capital
 <strong>Contact :</strong> <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a>
 ${info.hasDpo ? `<br><strong>DPO :</strong> ${escHtml(info.dpoNom)} — <a href="mailto:${escHtml(info.dpoEmail)}">${escHtml(info.dpoEmail)}</a>` : ''}</p>
 
-<h4>Hébergement</h4>
-<p><strong>Hébergeur :</strong> ${escHtml(info.hebergeur) || '<span style="color:#DC2626">[À COMPLÉTER — obligatoire loi LCEN art. 6]</span>'}</p>
+${info.hebergeur ? `<h4>Hébergement</h4>
+<p><strong>Hébergeur :</strong> ${escHtml(info.hebergeur)}</p>` : ''}
 
 <h4>Protection des données personnelles</h4>
 <p>${escHtml(info.raisonSociale)} collecte et traite des données personnelles conformément au Règlement (UE) 2016/679 (RGPD) et à la loi n°78-17 du 6 janvier 1978 modifiée.</p>
