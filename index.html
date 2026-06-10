@@ -1082,6 +1082,15 @@ function selectSuggestion(idx) {
     onFormeJuridiqueChange(fj);
   }
 
+  // Capital social depuis l'API
+  if (r.capital) {
+    const capFormate = Number(r.capital).toLocaleString('fr-FR') + ' €';
+    const capEl = document.getElementById('capitalSocial');
+    capEl.value = capFormate;
+    capEl.classList.remove('error');
+    document.getElementById('err_capitalSocial').classList.add('hidden');
+  }
+
   // L'API retourne maintenant un champ adresse unique
   document.getElementById('adresse').value = siege.adresse || [siege.code_postal, siege.libelle_commune].filter(Boolean).join(' ');
 
