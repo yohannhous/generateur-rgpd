@@ -1,0 +1,2040 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Générateur RGPD — TPE/PME Françaises</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root {
+    --blue: #2563EB;
+    --blue-light: #DBEAFE;
+    --blue-dark: #1D4ED8;
+    --gray: #F3F4F6;
+    --gray-border: #E5E7EB;
+    --gray-text: #6B7280;
+    --text: #111827;
+    --green: #10B981;
+    --orange: #F59E0B;
+    --red: #EF4444;
+    --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui,-apple-system,sans-serif; background: #F9FAFB; color: var(--text); font-size: 15px; line-height: 1.6; }
+  a { color: var(--blue); }
+
+  /* Header */
+  header { background: var(--blue); color: #fff; padding: 1.25rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+  header h1 { font-size: 1.25rem; font-weight: 700; }
+  header p { font-size: .85rem; opacity: .85; margin-top: .1rem; }
+  .header-badge { background: rgba(255,255,255,.2); border-radius: 999px; padding: .2rem .7rem; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+
+  /* Progress */
+  .progress-bar { background: #fff; border-bottom: 1px solid var(--gray-border); padding: 1rem 1.5rem; }
+  .steps { display: flex; align-items: center; gap: 0; max-width: 600px; margin: 0 auto; }
+  .step { display: flex; align-items: center; gap: .5rem; flex: 1; }
+  .step-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0; border: 2px solid var(--gray-border); background: #fff; color: var(--gray-text); transition: all .3s; }
+  .step-num.active { border-color: var(--blue); background: var(--blue); color: #fff; }
+  .step-num.done { border-color: var(--green); background: var(--green); color: #fff; }
+  .step-label { font-size: .8rem; color: var(--gray-text); font-weight: 500; }
+  .step-label.active { color: var(--blue); font-weight: 600; }
+  .step-label.done { color: var(--green); }
+  .step-connector { flex: 1; height: 2px; background: var(--gray-border); margin: 0 .5rem; transition: background .3s; }
+  .step-connector.done { background: var(--green); }
+
+  /* Layout */
+  .container { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+
+  /* Cards */
+  .card { background: #fff; border-radius: .75rem; box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.25rem; }
+  .card-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 1rem; display: flex; align-items: center; gap: .5rem; }
+  .card-title .icon { width: 28px; height: 28px; border-radius: .4rem; background: var(--blue-light); color: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+  .form-grid.full { grid-template-columns: 1fr; }
+  .field { display: flex; flex-direction: column; gap: .35rem; }
+  .field.span2 { grid-column: span 2; }
+  @media (max-width: 600px) { .field.span2 { grid-column: span 1; } }
+  label { font-size: .825rem; font-weight: 600; color: #374151; display: flex; align-items: center; gap: .4rem; }
+  input, select, textarea { border: 1.5px solid var(--gray-border); border-radius: .5rem; padding: .55rem .75rem; font-size: .9rem; font-family: inherit; width: 100%; transition: border-color .2s; background: #fff; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+  input.error, select.error { border-color: var(--red); }
+  textarea { resize: vertical; min-height: 80px; }
+  .field-hint { font-size: .75rem; color: var(--gray-text); }
+  .error-msg { font-size: .75rem; color: var(--red); }
+
+  /* Search */
+  .search-wrapper { position: relative; }
+  .search-wrapper .spinner { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); display: none; }
+  .spinner-ring { width: 18px; height: 18px; border: 2px solid var(--gray-border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1.5px solid var(--gray-border); border-top: none; border-radius: 0 0 .5rem .5rem; z-index: 100; box-shadow: var(--shadow-md); max-height: 240px; overflow-y: auto; }
+  .suggestion-item { padding: .65rem .75rem; cursor: pointer; border-bottom: 1px solid var(--gray-border); transition: background .15s; }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:hover { background: var(--blue-light); }
+  .suggestion-name { font-weight: 600; font-size: .875rem; }
+  .suggestion-details { font-size: .75rem; color: var(--gray-text); }
+  .api-offline { font-size: .75rem; color: var(--orange); padding: .35rem 0; display: none; }
+
+  /* Checkboxes traitements */
+  .treatments-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  @media (max-width: 600px) { .treatments-grid { grid-template-columns: 1fr; } }
+  .treatment-check { display: flex; align-items: flex-start; gap: .6rem; padding: .65rem .85rem; border: 1.5px solid var(--gray-border); border-radius: .5rem; cursor: pointer; transition: all .2s; user-select: none; }
+  .treatment-check:hover { border-color: var(--blue); background: var(--blue-light); }
+  .treatment-check.checked { border-color: var(--blue); background: var(--blue-light); }
+  .treatment-check input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; accent-color: var(--blue); }
+  .treatment-check-label { font-size: .875rem; font-weight: 500; }
+
+  /* Accordion */
+  .accordion { border: 1.5px solid var(--gray-border); border-radius: .6rem; margin-bottom: .75rem; overflow: hidden; }
+  .accordion-header { padding: .75rem 1rem; background: var(--gray); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: .9rem; }
+  .accordion-header:hover { background: #E9EAEC; }
+  .accordion-chevron { transition: transform .3s; font-size: .75rem; }
+  .accordion-body { padding: 1rem; display: none; }
+  .accordion-body.open { display: block; }
+  .accordion-chevron.open { transform: rotate(180deg); }
+
+  /* Badges CNIL */
+  .cnil-badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .7rem; font-weight: 600; padding: .15rem .45rem; border-radius: 999px; vertical-align: middle; }
+  .cnil-badge.source { background: #ECFDF5; color: #059669; }
+  .cnil-badge.modified { background: #FEF3C7; color: #D97706; }
+  .cnil-link { font-size: .75rem; color: var(--blue); display: block; margin-top: .5rem; }
+
+  /* Security checks */
+  .security-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  @media (max-width: 600px) { .security-grid { grid-column: 1fr; } }
+  .sec-check { display: flex; align-items: center; gap: .6rem; font-size: .875rem; cursor: pointer; }
+  .sec-check input { accent-color: var(--blue); width: 15px; height: 15px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .65rem 1.25rem; border-radius: .5rem; font-size: .9rem; font-weight: 600; border: none; cursor: pointer; transition: all .2s; text-decoration: none; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-secondary { background: var(--gray); color: var(--text); border: 1.5px solid var(--gray-border); }
+  .btn-secondary:hover { background: #E9EAEC; }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-success:hover { background: #059669; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #DC2626; }
+  .btn-outline { background: transparent; color: var(--blue); border: 1.5px solid var(--blue); }
+  .btn-outline:hover { background: var(--blue-light); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .nav-buttons { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; }
+
+  /* Alert */
+  .alert { border-radius: .5rem; padding: .85rem 1rem; font-size: .875rem; margin-bottom: 1rem; display: flex; gap: .65rem; align-items: flex-start; }
+  .alert-warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+  .alert-info { background: var(--blue-light); border: 1px solid #BFDBFE; color: #1E40AF; }
+  .alert-error { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; }
+
+  /* Tooltip */
+  .tooltip-wrap { position: relative; display: inline-block; }
+  .tooltip-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--gray-border); color: var(--gray-text); font-size: .7rem; cursor: help; font-weight: 700; }
+  .tooltip-box { position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #1F2937; color: #fff; font-size: .75rem; padding: .5rem .7rem; border-radius: .4rem; width: 220px; z-index: 200; display: none; line-height: 1.4; font-weight: 400; }
+  .tooltip-box::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #1F2937; }
+  .tooltip-wrap:hover .tooltip-box { display: block; }
+
+  /* Documents */
+  .doc-section { margin-bottom: 2rem; }
+  .doc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; flex-wrap: wrap; gap: .5rem; }
+  .doc-title { font-size: 1rem; font-weight: 700; }
+  .doc-content { background: #fff; border: 1.5px solid var(--gray-border); border-radius: .6rem; padding: 1.25rem; font-size: .85rem; line-height: 1.7; }
+  .doc-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  .doc-table th { background: var(--blue); color: #fff; padding: .5rem .75rem; text-align: left; font-weight: 600; }
+  .doc-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--gray-border); vertical-align: top; }
+  .doc-table tr:nth-child(even) td { background: var(--gray); }
+  .doc-footer { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--gray-border); font-size: .75rem; color: var(--gray-text); font-style: italic; }
+
+  /* DPO fields */
+  .dpo-fields { display: none; }
+  .dpo-fields.visible { display: contents; }
+
+  /* Closed company */
+  .closed-badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .75rem; background: #FEF2F2; color: var(--red); border-radius: 999px; padding: .2rem .6rem; font-weight: 600; }
+
+  /* Responsive nav */
+  @media (max-width: 500px) { .nav-buttons { flex-direction: column; gap: .75rem; } .btn { width: 100%; justify-content: center; } }
+
+  .hidden { display: none !important; }
+  .mt-1 { margin-top: .5rem; }
+  .mt-2 { margin-top: 1rem; }
+  .flex-gap { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+  /* Suggestions cliquables */
+  .suggestions-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+  .chip { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .65rem; border-radius: 999px; font-size: .75rem; cursor: pointer; border: 1.5px solid var(--gray-border); background: #fff; color: var(--gray-text); transition: all .15s; }
+  .chip:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+
+  /* Bouton IA */
+  .ai-btn { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .7rem; border-radius: .4rem; font-size: .78rem; font-weight: 600; background: linear-gradient(135deg,#7C3AED,#2563EB); color: #fff; border: none; cursor: pointer; transition: opacity .2s; }
+  .ai-btn:hover { opacity: .85; }
+  .ai-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .ai-generating { animation: pulse .8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* API key card */
+  .api-key-card { background: linear-gradient(135deg,#F5F3FF,#EFF6FF); border: 1.5px solid #C4B5FD; border-radius: .75rem; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+  .api-key-status { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; }
+  .api-key-status.valid { background: #ECFDF5; color: #059669; }
+  .api-key-status.invalid { background: #FEF2F2; color: #DC2626; }
+  .api-key-status.testing { background: #FEF3C7; color: #D97706; }
+
+  /* Pre text */
+  .pre-wrap { white-space: pre-wrap; word-break: break-word; }
+
+  /* DPO inline fields */
+  .dpo-inline { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛡️ Générateur RGPD</h1>
+    <p>Pour TPE/PME françaises — Conforme RGPD & recommandations CNIL 2024</p>
+  </div>
+  <span class="header-badge">100% local — aucune donnée envoyée</span>
+</header>
+
+<div class="progress-bar">
+  <div class="steps">
+    <div class="step">
+      <div class="step-num active" id="snum1">1</div>
+      <div class="step-label active" id="slbl1">Entreprise</div>
+    </div>
+    <div class="step-connector" id="sc1"></div>
+    <div class="step">
+      <div class="step-num" id="snum2">2</div>
+      <div class="step-label" id="slbl2">Traitements</div>
+    </div>
+    <div class="step-connector" id="sc2"></div>
+    <div class="step">
+      <div class="step-num" id="snum3">3</div>
+      <div class="step-label" id="slbl3">Documents</div>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="app">
+
+<!-- Import fichier projet -->
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="loadProject(this)">
+
+<!-- ÉTAPE 1 -->
+<div id="step1">
+<div class="api-key-card">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+    <div>
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:.2rem">🤖 Génération IA avec Claude</div>
+      <div style="font-size:.8rem;color:#5B21B6">Entrez votre clé API Anthropic pour que l'IA rédige automatiquement tous vos documents</div>
+    </div>
+    <span class="api-key-status" id="apiKeyStatus" style="display:none"></span>
+  </div>
+  <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap">
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="flex:1;min-width:200px;border-color:#C4B5FD"
+      oninput="onApiKeyInput()" autocomplete="off">
+    <button class="btn btn-secondary" onclick="testApiKey()" id="apiTestBtn" style="border-color:#7C3AED;color:#7C3AED;white-space:nowrap">Tester la clé</button>
+  </div>
+  <div style="font-size:.73rem;color:#6B7280;margin-top:.5rem">🔒 La clé reste dans votre navigateur, elle n'est jamais envoyée ailleurs que vers l'API Anthropic.</div>
+</div>
+
+  <!-- Champs cachés utilisés en arrière-plan -->
+  <input type="hidden" id="raisonSociale">
+  <input type="hidden" id="siret">
+  <input type="hidden" id="adresse">
+  <select id="formeJuridique" style="display:none">
+    <option value=""></option><option value="SARL">SARL</option><option value="SAS">SAS</option>
+    <option value="SASU">SASU</option><option value="EURL">EURL</option><option value="EI">Entreprise individuelle (EI)</option>
+    <option value="SA">SA</option><option value="SNC">SNC</option><option value="Association">Association (loi 1901)</option><option value="Autre">Autre</option>
+  </select>
+  <select id="secteur" style="display:none">
+    <option value=""></option>
+    <option value="agriculture">Agriculture / Pêche / Sylviculture</option>
+    <option value="industrie-extractive">Industries extractives / Mines</option>
+    <option value="industrie-manufacturiere">Industrie manufacturière</option>
+    <option value="energie">Énergie / Eau / Environnement</option>
+    <option value="construction">Construction / BTP</option>
+    <option value="commerce">Commerce / Réparation automobile</option>
+    <option value="transport">Transports / Logistique</option>
+    <option value="restauration">Restauration / Hôtellerie</option>
+    <option value="informatique">Informatique / Communication</option>
+    <option value="finance">Finance / Assurance</option>
+    <option value="immobilier">Immobilier</option>
+    <option value="services-pro">Services professionnels / Conseil / Juridique</option>
+    <option value="services-admin">Services administratifs / RH / Nettoyage</option>
+    <option value="securite">Sécurité / Surveillance</option>
+    <option value="administration">Administration publique</option>
+    <option value="enseignement">Enseignement / Formation</option>
+    <option value="sante">Santé / Action sociale</option>
+    <option value="arts-loisirs">Arts / Spectacles / Loisirs / Sport</option>
+    <option value="autres-services">Autres services personnels</option>
+    <option value="autre">Autre</option>
+  </select>
+
+  <!-- Question 1 : Entreprise -->
+  <div class="card">
+    <div class="card-title"><div class="icon">🏢</div> Quelle est votre entreprise ?</div>
+    <div class="field">
+      <div class="search-wrapper">
+        <input type="text" id="searchInput" placeholder="Tapez votre SIRET ou raison sociale..." autocomplete="off" style="font-size:1rem;padding:.65rem .9rem">
+        <div class="spinner" id="searchSpinner"><div class="spinner-ring"></div></div>
+        <div class="suggestions" id="suggestions"></div>
+      </div>
+      <div class="api-offline" id="apiOffline">⚠️ Recherche automatique indisponible — remplissez manuellement</div>
+    </div>
+
+    <!-- Résumé entreprise après sélection -->
+    <div id="companySummary" style="display:none;margin-top:.75rem">
+      <div style="background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:.75rem;padding:.85rem 1rem">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:.5rem">
+          <div>
+            <div style="font-weight:700;font-size:1rem;color:#166534" id="cs_nom">—</div>
+            <div style="font-size:.82rem;color:#555;margin-top:.25rem" id="cs_details">—</div>
+          </div>
+          <button onclick="resetCompanySearch()" style="font-size:.75rem;color:#6B7280;background:none;border:1px solid #D1D5DB;border-radius:.4rem;padding:.2rem .5rem;cursor:pointer;white-space:nowrap">✏️ Modifier</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saisie manuelle (si pas de recherche) -->
+    <div id="manualCompanyFields" style="display:none;margin-top:.75rem">
+      <div class="form-grid">
+        <div class="field">
+          <label>Raison sociale <span style="color:var(--red)">*</span></label>
+          <input type="text" id="raisonSocialeManual" placeholder="Ex : SARL Dupont Services" oninput="document.getElementById('raisonSociale').value=this.value">
+          <div class="error-msg hidden" id="err_raisonSociale">Champ obligatoire</div>
+        </div>
+        <div class="field">
+          <label>SIRET <span style="color:var(--red)">*</span></label>
+          <input type="text" id="siretManual" placeholder="14 chiffres" oninput="document.getElementById('siret').value=this.value">
+          <div class="error-msg hidden" id="err_siret">Champ obligatoire</div>
+        </div>
+        <div class="field span2">
+          <label>Adresse complète</label>
+          <input type="text" id="adresseManual" placeholder="Ex : 12 rue de la Paix, 75001 Paris" oninput="document.getElementById('adresse').value=this.value">
+        </div>
+        <div class="field">
+          <label>Forme juridique</label>
+          <select onchange="document.getElementById('formeJuridique').value=this.value">
+            <option value="">-- Sélectionner --</option>
+            <option value="SARL">SARL</option><option value="SAS">SAS</option><option value="SASU">SASU</option>
+            <option value="EURL">EURL</option><option value="EI">Entreprise individuelle (EI)</option>
+            <option value="SA">SA</option><option value="SNC">SNC</option><option value="Association">Association (loi 1901)</option><option value="Autre">Autre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Secteur d'activité <span style="color:var(--red)">*</span></label>
+          <select id="secteurManual" onchange="document.getElementById('secteur').value=this.value;onSecteurChange(this.value)">
+            <option value="">-- Sélectionner --</option>
+            <option value="agriculture">Agriculture / Pêche / Sylviculture</option>
+            <option value="industrie-extractive">Industries extractives / Mines</option>
+            <option value="industrie-manufacturiere">Industrie manufacturière</option>
+            <option value="energie">Énergie / Eau / Environnement</option>
+            <option value="construction">Construction / BTP</option>
+            <option value="commerce">Commerce / Réparation automobile</option>
+            <option value="transport">Transports / Logistique</option>
+            <option value="restauration">Restauration / Hôtellerie</option>
+            <option value="informatique">Informatique / Communication</option>
+            <option value="finance">Finance / Assurance</option>
+            <option value="immobilier">Immobilier</option>
+            <option value="services-pro">Services professionnels / Conseil / Juridique</option>
+            <option value="services-admin">Services administratifs / RH / Nettoyage</option>
+            <option value="securite">Sécurité / Surveillance</option>
+            <option value="administration">Administration publique</option>
+            <option value="enseignement">Enseignement / Formation</option>
+            <option value="sante">Santé / Action sociale</option>
+            <option value="arts-loisirs">Arts / Spectacles / Loisirs / Sport</option>
+            <option value="autres-services">Autres services personnels</option>
+            <option value="autre">Autre</option>
+          </select>
+          <div class="error-msg hidden" id="err_secteur">Champ obligatoire</div>
+        </div>
+      </div>
+    </div>
+    <div id="err_raisonSociale_search" class="error-msg hidden" style="margin-top:.5rem">Veuillez sélectionner ou saisir votre entreprise</div>
+  </div>
+
+  <!-- Question 2 : Responsable + Email -->
+  <div class="card">
+    <div class="card-title"><div class="icon">👤</div> Qui est responsable de vos données ?</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Nom du responsable légal <span style="color:var(--red)">*</span></label>
+        <input type="text" id="responsableLegal" placeholder="Prénom Nom">
+        <div class="error-msg hidden" id="err_responsableLegal">Champ obligatoire</div>
+      </div>
+      <div class="field">
+        <label>Email de contact RGPD <span style="color:var(--red)">*</span></label>
+        <input type="email" id="emailRGPD" placeholder="rgpd@exemple.fr">
+        <div class="error-msg hidden" id="err_emailRGPD">Email invalide</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question 3 : Outils utilisés -->
+  <div class="card">
+    <div class="card-title"><div class="icon">🛠️</div> Quels outils utilisez-vous ?</div>
+    <p style="font-size:.85rem;color:var(--gray-text);margin-bottom:.75rem">Cochez tout ce que vous utilisez — l'IA s'en servira pour identifier vos sous-traitants.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem .75rem;margin-bottom:1rem">
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_google" style="width:1rem;height:1rem"> Google Workspace / Gmail</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_microsoft" style="width:1rem;height:1rem"> Microsoft 365 / Teams</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_stripe" style="width:1rem;height:1rem"> Stripe / PayPal (paiement)</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_mailchimp" style="width:1rem;height:1rem"> Mailchimp / Brevo (emailing)</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_crm" style="width:1rem;height:1rem"> CRM (HubSpot, Salesforce…)</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_compta" style="width:1rem;height:1rem"> Logiciel comptable (Sage, Cegid…)</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_rh" style="width:1rem;height:1rem"> Logiciel RH / paie (Silae, PayFit…)</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_analytics" style="width:1rem;height:1rem"> Google Analytics / statistiques</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_cloud" style="width:1rem;height:1rem"> Hébergement cloud (AWS, OVH…)</label>
+      <label style="display:flex;align-items:center;gap:.5rem;font-weight:400;cursor:pointer"><input type="checkbox" id="outil_video" style="width:1rem;height:1rem"> Vidéosurveillance connectée</label>
+    </div>
+    <div class="field">
+      <label style="font-size:.85rem">Autres outils non listés (facultatif)</label>
+      <input type="text" id="outilsAutres" placeholder="Ex : Shopify, Doctolib, mon logiciel métier...">
+    </div>
+    <!-- Champ caché pour compatibilité -->
+    <input type="radio" name="outilsAm" value="non" id="outilsAmNon" checked style="display:none">
+    <input type="radio" name="outilsAm" value="oui" id="outilsAmOui" style="display:none">
+  </div>
+
+  <!-- Question 4 : DPO (conditionnel) -->
+  <div class="card" id="dpoCard" style="display:none">
+    <div class="card-title"><div class="icon">🛡️</div> Avez-vous un DPO ?</div>
+    <div id="dpoRequiredMsg" style="margin-bottom:.75rem;font-size:.85rem;"></div>
+    <div style="display:flex;gap:1.5rem;margin-bottom:.75rem">
+      <label style="font-weight:400;display:flex;align-items:center;gap:.5rem;font-size:.95rem;cursor:pointer">
+        <input type="radio" name="hasDpo" value="non" checked id="dpoNon" onchange="toggleDpo()" style="width:1.1rem;height:1.1rem"> Non
+      </label>
+      <label style="font-weight:400;display:flex;align-items:center;gap:.5rem;font-size:.95rem;cursor:pointer">
+        <input type="radio" name="hasDpo" value="oui" id="dpoOui" onchange="toggleDpo()" style="width:1.1rem;height:1.1rem"> Oui
+      </label>
+    </div>
+    <div class="form-grid" id="dpoFields" style="display:none">
+      <div class="field dpo-fields">
+        <label>Nom du DPO</label>
+        <input type="text" id="dpoNom" placeholder="Prénom Nom du DPO">
+      </div>
+      <div class="field dpo-fields" id="dpoFieldsEmail">
+        <label>Email du DPO</label>
+        <input type="email" id="dpoEmail" placeholder="dpo@exemple.fr">
+      </div>
+    </div>
+  </div>
+
+  <div id="alertSurveillance" class="alert alert-warning hidden">
+    ⚠️ Votre activité implique une déclaration préfectorale pour les systèmes de vidéosurveillance (loi du 21 janvier 1995).
+    <a href="https://www.interieur.gouv.fr" target="_blank">Consulter le site du Ministère de l'Intérieur →</a>
+  </div>
+
+  <div class="nav-buttons">
+    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📂 Ouvrir un fichier</button>
+    <button class="btn btn-primary" onclick="nextStep(1)">Étape suivante →</button>
+  </div>
+</div>
+
+<!-- ÉTAPE 2 -->
+<div id="step2" class="hidden">
+  <div class="card">
+    <div class="card-title"><div class="icon">📋</div> Quels types de données collectez-vous ?</div>
+    <p style="font-size:.85rem;color:var(--gray-text);margin-bottom:1rem">Cochez tout ce qui s'applique à votre activité. L'IA rédigera les documents correspondants.</p>
+    <div class="treatments-grid" id="treatmentsGrid"></div>
+  </div>
+
+  <!-- Accordéons masqués (pour modification avancée) -->
+  <div id="treatmentsDetails" style="display:none"></div>
+
+  <!-- Mesures de sécurité masquées (auto-gérées) -->
+  <div style="display:none">
+    <input type="checkbox" id="sec_mdp" checked>
+    <input type="checkbox" id="sec_antivirus" checked>
+    <input type="checkbox" id="sec_chiffrement">
+    <input type="checkbox" id="sec_acces" checked>
+    <input type="checkbox" id="sec_sauvegardes" checked>
+    <input type="checkbox" id="sec_formation">
+    <input type="checkbox" id="sec_contrats">
+  </div>
+
+  <!-- Overlay de génération IA -->
+  <div id="aiProgressOverlay" style="display:none;background:#F5F3FF;border:1.5px solid #C4B5FD;border-radius:.75rem;padding:1.5rem;text-align:center;margin:1rem 0">
+    <div style="font-size:1.5rem;margin-bottom:.5rem">✨</div>
+    <div style="font-weight:700;font-size:1rem;color:#5B21B6" id="aiProgressText">Génération en cours...</div>
+    <div style="font-size:.83rem;color:#6B7280;margin-top:.4rem" id="aiProgressSub">Préparation...</div>
+    <div style="background:#E9D5FF;border-radius:999px;height:.5rem;margin-top:1rem;overflow:hidden">
+      <div id="aiProgressBar" style="background:#7C3AED;height:100%;width:0%;transition:width .3s ease;border-radius:999px"></div>
+    </div>
+  </div>
+
+  <div class="nav-buttons">
+    <button class="btn btn-secondary" onclick="prevStep(2)">← Retour</button>
+    <button class="btn btn-primary" id="step2NextBtn" onclick="nextStep(2)">Générer mes documents RGPD →</button>
+  </div>
+</div>
+
+<!-- ÉTAPE 3 -->
+<div id="step3" class="hidden">
+  <div class="alert alert-info">
+    ✅ Vos documents RGPD ont été générés. Vous pouvez les consulter, copier ou exporter en PDF.
+  </div>
+
+  <div class="flex-gap" style="margin-bottom:1.5rem">
+    <button class="btn btn-success" onclick="exportPDF()">⬇️ Exporter en 4 PDF séparés</button>
+    <button class="btn btn-secondary" onclick="saveProject()">💾 Enregistrer le dossier</button>
+    <button class="btn btn-secondary" onclick="resetForm()">🔄 Recommencer</button>
+  </div>
+
+  <div id="documents"></div>
+
+  <div class="nav-buttons">
+    <button class="btn btn-secondary" onclick="prevStep(3)">← Retour aux traitements</button>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ==================== DONNÉES CNIL ====================
+const CNIL_FICHES = {
+  videosurveillance: {
+    id: "videosurveillance",
+    nom: "Vidéosurveillance / Système de Sécurité Électronique",
+    secteurs: ["sécurité/surveillance", "commerce", "services"],
+    finalite: "Assurer la sécurité des biens et des personnes, prévenir et détecter les actes malveillants, protéger les locaux",
+    base_legale: "Intérêt légitime (Art. 6.1.f RGPD)",
+    personnes_concernees: "Salariés, clients, visiteurs, toute personne présente dans les zones surveillées",
+    categories_donnees: "Images de vidéosurveillance, horodatage, données de localisation dans les locaux",
+    duree_conservation: "1 mois maximum (recommandation CNIL). En cas d'incident : durée nécessaire à la procédure judiciaire",
+    destinataires: "Direction, responsable sécurité, forces de l'ordre sur réquisition judiciaire",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Affichage obligatoire dans les zones surveillées. Déclaration préfectorale obligatoire (loi du 21 janvier 1995). Consultation du CSE obligatoire si salariés concernés.",
+    sous_traitants_types: "Installateur système de vidéosurveillance, hébergeur des enregistrements"
+  },
+  fichier_clients: {
+    id: "fichier_clients",
+    nom: "Gestion de la relation client et prospects",
+    secteurs: ["tous"],
+    finalite: "Gestion des commandes, devis, facturation, suivi commercial, prospection",
+    base_legale: "Exécution du contrat (Art. 6.1.b) pour les clients. Intérêt légitime (Art. 6.1.f) pour les prospects.",
+    personnes_concernees: "Clients, prospects",
+    categories_donnees: "Nom, prénom, coordonnées (adresse, email, téléphone), données de facturation, historique des achats/interventions",
+    duree_conservation: "Clients actifs : durée de la relation + 3 ans. Prospects : 3 ans sans contact. Données comptables : 10 ans (obligation légale)",
+    destinataires: "Service commercial, service comptabilité, prestataires de livraison",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Droit d'opposition à la prospection commerciale à tout moment.",
+    sous_traitants_types: "CRM (ex: Salesforce, HubSpot), logiciel de facturation, hébergeur"
+  },
+  gestion_rh: {
+    id: "gestion_rh",
+    nom: "Gestion des ressources humaines et de la paie",
+    secteurs: ["tous"],
+    finalite: "Gestion administrative du personnel, établissement des bulletins de paie, suivi des congés et absences, recrutement",
+    base_legale: "Obligation légale (Art. 6.1.c) pour la paie. Exécution du contrat (Art. 6.1.b) pour la gestion RH.",
+    personnes_concernees: "Salariés, candidats",
+    categories_donnees: "Nom, prénom, adresse, numéro de sécurité sociale, RIB, salaire, contrat de travail, évaluations, arrêts maladie",
+    duree_conservation: "Bulletins de paie : 50 ans. Dossier salarié : 5 ans après départ. Candidatures non retenues : 2 ans",
+    destinataires: "Service RH, direction, expert-comptable, organismes sociaux (URSSAF, retraite)",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Données de santé = données sensibles → traitement autorisé uniquement pour la gestion des absences maladie. Consultation CSE obligatoire.",
+    sous_traitants_types: "Logiciel de paie (ex: Sage, Silae, PayFit), expert-comptable"
+  },
+  formulaire_contact: {
+    id: "formulaire_contact",
+    nom: "Formulaires de contact et demandes de devis en ligne",
+    secteurs: ["tous"],
+    finalite: "Répondre aux demandes d'information, établir des devis, qualifier des prospects",
+    base_legale: "Consentement (Art. 6.1.a) ou mesures précontractuelles (Art. 6.1.b)",
+    personnes_concernees: "Prospects, clients potentiels",
+    categories_donnees: "Nom, prénom, email, téléphone, message libre, besoins exprimés",
+    duree_conservation: "3 ans à compter du dernier contact",
+    destinataires: "Service commercial, techniciens",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Case à cocher de consentement obligatoire sur le formulaire. Lien vers la politique de confidentialité obligatoire.",
+    sous_traitants_types: "Hébergeur du site web, outil de formulaire (ex: Typeform, JotForm)"
+  },
+  newsletter: {
+    id: "newsletter",
+    nom: "Envoi d'emails commerciaux et newsletters",
+    secteurs: ["tous"],
+    finalite: "Prospection commerciale, fidélisation, information sur les offres et services",
+    base_legale: "Consentement (Art. 6.1.a) pour les prospects. Intérêt légitime (Art. 6.1.f) pour les clients existants sur des produits/services similaires.",
+    personnes_concernees: "Clients, prospects ayant consenti",
+    categories_donnees: "Email, nom, prénom, historique d'ouverture et de clic",
+    duree_conservation: "3 ans sans interaction. Suppression immédiate sur demande de désinscription.",
+    destinataires: "Service marketing",
+    transfert_hors_ue: true,
+    transfert_detail: "Possible selon l'outil d'emailing utilisé (ex: Mailchimp → USA, couvert par les clauses contractuelles types UE)",
+    mentions_specifiques: "Lien de désinscription obligatoire dans chaque email (Art. L.34-5 CPCE). Consentement opt-in explicite requis.",
+    sous_traitants_types: "Plateforme d'emailing (ex: Mailchimp, Brevo, Mailjet)"
+  },
+  enregistrement_appels: {
+    id: "enregistrement_appels",
+    nom: "Enregistrement des appels téléphoniques",
+    secteurs: ["tous"],
+    finalite: "Amélioration de la qualité de service, formation des équipes, preuve en cas de litige",
+    base_legale: "Intérêt légitime (Art. 6.1.f) avec information préalable obligatoire",
+    personnes_concernees: "Clients, prospects, tout appelant",
+    categories_donnees: "Voix, contenu de la conversation, numéro de téléphone, horodatage",
+    duree_conservation: "Maximum 6 mois (recommandation CNIL)",
+    destinataires: "Responsable qualité, direction",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Message d'information obligatoire en début d'appel : 'Cet appel est susceptible d'être enregistré à des fins de qualité de service'. Droit d'opposition de l'appelant.",
+    sous_traitants_types: "Opérateur téléphonique, IPBX/central téléphonique, IA réceptionniste"
+  },
+  geolocalisation: {
+    id: "geolocalisation",
+    nom: "Géolocalisation des véhicules professionnels",
+    secteurs: ["sécurité/surveillance", "services", "commerce"],
+    finalite: "Suivi des interventions, optimisation des tournées, sécurité des techniciens, justification des temps de déplacement",
+    base_legale: "Intérêt légitime (Art. 6.1.f)",
+    personnes_concernees: "Salariés utilisant des véhicules de service",
+    categories_donnees: "Position GPS en temps réel, historique des déplacements, kilométrage, temps de conduite",
+    duree_conservation: "2 mois pour les données de localisation. Données agrégées (km totaux) : 5 ans",
+    destinataires: "Direction, responsable planning",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Information préalable des salariés obligatoire. Consultation CSE obligatoire. Interdiction de surveillance permanente hors temps de travail. La géolocalisation ne peut pas servir à contrôler le respect des limitations de vitesse.",
+    sous_traitants_types: "Fournisseur de solution GPS (ex: Coyote Business, Quartix)"
+  },
+  donnees_bancaires: {
+    id: "donnees_bancaires",
+    nom: "Données bancaires clients",
+    secteurs: ["tous"],
+    finalite: "Encaissement des paiements clients, exécution des transactions financières, prévention de la fraude",
+    base_legale: "Exécution du contrat (Art. 6.1.b RGPD)",
+    personnes_concernees: "Clients ayant effectué un paiement ou souscrit un prélèvement automatique",
+    categories_donnees: "IBAN / RIB, données de carte bancaire (traitées par le prestataire de paiement), montants et historique des transactions",
+    duree_conservation: "Données de paiement CB : 13 mois. RIB pour prélèvement : durée du contrat. Données comptables liées : 10 ans (obligation légale)",
+    destinataires: "Service comptabilité, prestataire de paiement, établissement bancaire, expert-comptable",
+    transfert_hors_ue: true,
+    transfert_detail: "États-Unis si utilisation de Stripe ou PayPal — couvert par les clauses contractuelles types (CCT UE)",
+    mentions_specifiques: "Ne jamais stocker les numéros de carte bancaire complets — déléguer à un prestataire certifié PCI-DSS (Stripe, Payplug, etc.). Minimiser les données : ne conserver que ce qui est strictement nécessaire.",
+    sous_traitants_types: "Prestataire de paiement (Stripe, PayPal, Payplug, Lyra), établissement bancaire, expert-comptable, logiciel comptable"
+  },
+  facturation: {
+    id: "facturation",
+    nom: "Facturation et comptabilité",
+    secteurs: ["tous"],
+    finalite: "Établissement et archivage des factures, suivi des règlements, déclarations fiscales",
+    base_legale: "Obligation légale (Art. 6.1.c — Code de commerce, CGI)",
+    personnes_concernees: "Clients, fournisseurs",
+    categories_donnees: "Nom/raison sociale, adresse, SIRET, coordonnées bancaires (IBAN pour prélèvement), montants, TVA",
+    duree_conservation: "10 ans (délai légal — Art. L.123-22 Code de commerce)",
+    destinataires: "Service comptabilité, expert-comptable, administration fiscale",
+    transfert_hors_ue: false,
+    mentions_specifiques: "Conservation obligatoire 10 ans. Données bancaires : conserver uniquement ce qui est nécessaire au paiement.",
+    sous_traitants_types: "Logiciel de facturation, expert-comptable, banque"
+  }
+};
+
+const TREATMENTS_LIST = [
+  { id: "fichier_clients", label: "Fichier clients / prospects" },
+  { id: "videosurveillance", label: "Vidéosurveillance" },
+  { id: "gestion_rh", label: "Gestion des salariés / RH" },
+  { id: "formulaire_contact", label: "Formulaires de contact / devis en ligne" },
+  { id: "newsletter", label: "Emails commerciaux / newsletter" },
+  { id: "enregistrement_appels", label: "Enregistrement d'appels téléphoniques" },
+  { id: "facturation", label: "Facturation et comptabilité" },
+  { id: "geolocalisation", label: "Géolocalisation de véhicules ou salariés" },
+  { id: "donnees_bancaires", label: "Données bancaires clients" },
+  { id: "_donnees_sensibles", label: "Données sensibles (santé, religion, biométrie)", noFiche: true }
+];
+
+// État de l'app
+let currentStep = 1;
+let treatmentData = {};
+let apiAvailable = true;
+let debounceTimer = null;
+let claudeApiKey = '';
+let claudeApiValid = false;
+
+// ==================== SUGGESTIONS PAR CHAMP ====================
+const FIELD_SUGGESTIONS = {
+  fichier_clients: {
+    finalite: ["Gestion des commandes et de la facturation", "Suivi commercial et fidélisation", "Prospection et relances clients"],
+    base_legale: ["Exécution du contrat (Art. 6.1.b)", "Intérêt légitime (Art. 6.1.f)", "Obligation légale (Art. 6.1.c)"],
+    duree_conservation: ["3 ans après le dernier contact", "Durée de la relation + 3 ans", "10 ans pour les données comptables"],
+    destinataires: ["Service commercial", "Service comptabilité", "Expert-comptable"]
+  },
+  videosurveillance: {
+    finalite: ["Sécurité des biens et des personnes", "Prévention des actes malveillants", "Protection des locaux et du personnel"],
+    base_legale: ["Intérêt légitime (Art. 6.1.f)", "Obligation légale (Art. 6.1.c)"],
+    duree_conservation: ["1 mois maximum", "72 heures en cas d'incident", "Durée de la procédure judiciaire si incident"],
+    destinataires: ["Direction", "Responsable sécurité", "Forces de l'ordre sur réquisition"]
+  },
+  gestion_rh: {
+    finalite: ["Gestion de la paie et des bulletins de salaire", "Suivi des congés et absences", "Recrutement et gestion des candidatures"],
+    base_legale: ["Obligation légale (Art. 6.1.c)", "Exécution du contrat de travail (Art. 6.1.b)"],
+    duree_conservation: ["Bulletins de paie : 50 ans", "Dossier salarié : 5 ans après départ", "Candidatures non retenues : 2 ans"],
+    destinataires: ["Service RH", "Expert-comptable", "Organismes sociaux (URSSAF, retraite)"]
+  },
+  formulaire_contact: {
+    finalite: ["Répondre aux demandes d'information", "Établir des devis et qualifier des prospects", "Suivi des demandes clients"],
+    base_legale: ["Consentement (Art. 6.1.a)", "Mesures précontractuelles (Art. 6.1.b)"],
+    duree_conservation: ["3 ans à compter du dernier contact", "1 an sans suite donnée", "Durée de la relation commerciale"],
+    destinataires: ["Service commercial", "Direction", "Techniciens / Prestataires"]
+  },
+  newsletter: {
+    finalite: ["Envoi d'offres commerciales et promotions", "Information sur les nouveautés et services", "Fidélisation de la clientèle"],
+    base_legale: ["Consentement explicite (Art. 6.1.a)", "Intérêt légitime clients existants (Art. 6.1.f)"],
+    duree_conservation: ["3 ans sans interaction", "Suppression sur désinscription", "2 ans après le dernier achat"],
+    destinataires: ["Service marketing", "Prestataire emailing"]
+  },
+  enregistrement_appels: {
+    finalite: ["Amélioration de la qualité de service", "Formation des équipes", "Preuve en cas de litige"],
+    base_legale: ["Intérêt légitime (Art. 6.1.f)", "Consentement (Art. 6.1.a)"],
+    duree_conservation: ["6 mois maximum", "30 jours après l'appel", "1 an en cas de litige"],
+    destinataires: ["Responsable qualité", "Direction", "Équipe formation"]
+  },
+  geolocalisation: {
+    finalite: ["Suivi des interventions terrain", "Optimisation des tournées", "Sécurité des techniciens"],
+    base_legale: ["Intérêt légitime (Art. 6.1.f)", "Exécution du contrat de travail (Art. 6.1.b)"],
+    duree_conservation: ["2 mois pour les positions GPS", "5 ans pour les données kilométriques agrégées"],
+    destinataires: ["Direction", "Responsable planning", "Responsable RH"]
+  },
+  facturation: {
+    finalite: ["Établissement et archivage des factures", "Suivi des règlements", "Déclarations fiscales et comptables"],
+    base_legale: ["Obligation légale (Art. 6.1.c — Code de commerce)", "Exécution du contrat (Art. 6.1.b)"],
+    duree_conservation: ["10 ans (obligation légale)", "6 ans pour les pièces comptables", "Durée de prescription fiscale"],
+    destinataires: ["Service comptabilité", "Expert-comptable", "Administration fiscale"]
+  }
+};
+
+// ==================== API CLAUDE ====================
+function onApiKeyInput() {
+  claudeApiValid = false;
+  const status = document.getElementById('apiKeyStatus');
+  status.style.display = 'none';
+}
+
+async function testApiKey() {
+  // Nettoyer la clé : supprimer tout caractère non-ASCII (espaces invisibles, guillemets typographiques, etc.)
+  const raw = document.getElementById('apiKeyInput').value;
+  const key = raw.replace(/[^\x20-\x7E]/g, '').trim();
+  // Remettre la valeur nettoyée dans le champ
+  document.getElementById('apiKeyInput').value = key;
+  if (!key) { alert('Entrez une clé API.'); return; }
+  const btn = document.getElementById('apiTestBtn');
+  const status = document.getElementById('apiKeyStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Test...';
+  status.className = 'api-key-status testing';
+  status.textContent = '⏳ Test en cours...';
+  status.style.display = 'inline-flex';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-allow-browser': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Test' }]
+      })
+    });
+    if (resp.ok) {
+      claudeApiKey = key;
+      claudeApiValid = true;
+      status.className = 'api-key-status valid';
+      status.textContent = '✅ Clé valide — IA activée';
+      updateAiGenerateAllBtn();
+    } else if (resp.status === 401) {
+      throw new Error('Clé API incorrecte ou expirée (401)');
+    } else if (resp.status === 403) {
+      throw new Error('Accès refusé — vérifiez les permissions de la clé (403)');
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'Erreur API (statut ' + resp.status + ')');
+    }
+  } catch(e) {
+    claudeApiValid = false;
+    status.className = 'api-key-status invalid';
+    status.textContent = '❌ ' + (e.message || e.toString());
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Tester la clé';
+  }
+}
+
+async function generateWithAI(treatId, field, btnEl) {
+  if (!claudeApiValid) return;
+  const info = getFormData();
+  const fiche = CNIL_FICHES[treatId] || {};
+  const label = TREATMENTS_LIST.find(t => t.id === treatId)?.label || treatId;
+  const fieldLabels = { finalite: 'finalité', base_legale: 'base légale', duree_conservation: 'durée de conservation', destinataires: 'destinataires des données', personnes_concernees: 'personnes concernées', categories_donnees: 'catégories de données', sous_traitants: 'sous-traitants impliqués' };
+  const outilsListe = info.outilsListe || 'aucun outil spécifié';
+
+  let fieldInstruction = '';
+  if (field === 'sous_traitants') {
+    fieldInstruction = `Liste uniquement les sous-traitants pertinents pour ce traitement parmi : ${outilsListe}. Si aucun n'est pertinent, indique les outils typiques pour ce secteur. Noms séparés par des virgules, 1 ligne max, pas d'explication.`;
+  } else if (field === 'base_legale') {
+    fieldInstruction = `Réponds UNIQUEMENT avec le nom de la base légale et l'article RGPD entre parenthèses. Exemple : "Exécution du contrat (Art. 6.1.b RGPD)". 1 ligne, pas d'explication.`;
+  } else if (['personnes_concernees', 'categories_donnees'].includes(field)) {
+    fieldInstruction = `Réponds avec une liste de mots-clés séparés par des virgules, sans phrase ni explication. 1 ligne, 5 éléments maximum.`;
+  } else if (field === 'destinataires') {
+    fieldInstruction = `Réponds avec 3 destinataires maximum, séparés par des virgules, sans phrase ni explication. Garde uniquement les plus importants.`;
+  } else if (field === 'duree_conservation') {
+    fieldInstruction = `Réponds avec les durées légales en 1 ligne, format : "Type de donnée : durée". 2 durées maximum, 15 mots max, pas d'explication.`;
+  } else if (field === 'finalite') {
+    fieldInstruction = `Réponds avec 1 phrase courte et précise expliquant le but du traitement. Style juridique, 20 mots maximum. Pas de titre, pas d'explication.`;
+  } else {
+    fieldInstruction = `Réponds avec 1 à 2 phrases concises, style juridique, adapté à une TPE/PME française. Pas de titre, pas d'explication.`;
+  }
+
+  const prompt = `Tu es un expert juridique RGPD français. Génère un texte court et précis pour le champ "${fieldLabels[field] || field}" du traitement "${fiche.nom || label}" pour l'entreprise suivante :
+- Nom : ${info.raisonSociale || 'non renseigné'}
+- Secteur : ${info.secteur || 'non renseigné'}
+- Forme juridique : ${info.formeJuridique || 'non renseignée'}
+- Outils utilisés : ${outilsListe}
+
+${fieldInstruction}`;
+
+  const origText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.classList.add('ai-generating');
+  btnEl.textContent = '⏳ Génération...';
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': claudeApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-allow-browser': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!resp.ok) throw new Error('Erreur API');
+    const data = await resp.json();
+    const text = data.content?.[0]?.text?.trim() || '';
+    if (text) {
+      const textarea = document.getElementById('tf_' + treatId + '_' + field);
+      if (textarea) {
+        textarea.value = text;
+        if (!treatmentData[treatId]) treatmentData[treatId] = {};
+        if (!treatmentData[treatId][field]) treatmentData[treatId][field] = {};
+        treatmentData[treatId][field].value = text;
+        treatmentData[treatId][field].modified = true;
+        // Update badge
+        const lbl = textarea.closest('.field')?.querySelector('label');
+        if (lbl) { const b = lbl.querySelector('.cnil-badge'); if (b) b.outerHTML = '<span class="cnil-badge modified">✏️ Modifié</span>'; }
+      }
+    }
+  } catch(e) {
+    alert('Erreur lors de la génération : ' + e.message);
+  } finally {
+    btnEl.disabled = false;
+    btnEl.classList.remove('ai-generating');
+    btnEl.textContent = origText;
+  }
+}
+
+// ==================== GÉNÉRATION IA GLOBALE ====================
+async function autoGenerateAndProceed() {
+  if (!claudeApiValid) return;
+
+  // Appliquer outils américains à tous les traitements
+  const outilsAm = getFormData().outilsAmericains;
+  const checked = TREATMENTS_LIST.filter(t => treatmentData[t.id] !== undefined);
+
+  if (outilsAm) {
+    checked.forEach(t => {
+      if (!treatmentData[t.id]) treatmentData[t.id] = {};
+      treatmentData[t.id].transfert_hors_ue = { value: 'oui', modified: true };
+      treatmentData[t.id].transfert_detail = { value: 'États-Unis — Clauses contractuelles types (CCT UE)', modified: true };
+    });
+  }
+
+  // Afficher overlay
+  const overlay = document.getElementById('aiProgressOverlay');
+  const btn = document.getElementById('step2NextBtn');
+  overlay.style.display = 'block';
+  btn.disabled = true;
+
+  const fields = ['finalite', 'base_legale', 'duree_conservation', 'destinataires', 'sous_traitants'];
+  const total = checked.length * fields.length;
+  let done = 0;
+
+  // Afficher les accordéons pour que les champs existent dans le DOM
+  document.getElementById('treatmentsDetails').style.display = 'block';
+  renderTreatmentDetails();
+
+  for (const t of checked) {
+    document.getElementById('aiProgressSub').textContent = `Traitement : ${CNIL_FICHES[t.id]?.nom || t.label}`;
+    for (const field of fields) {
+      document.getElementById('aiProgressText').textContent = `Génération ${done + 1} / ${total}`;
+      document.getElementById('aiProgressBar').style.width = Math.round((done / total) * 100) + '%';
+      const fakebtn = { disabled: false, classList: { add: ()=>{}, remove: ()=>{} }, textContent: '' };
+      await generateWithAI(t.id, field, fakebtn);
+      done++;
+      await new Promise(r => setTimeout(r, 150));
+    }
+  }
+
+  document.getElementById('aiProgressBar').style.width = '100%';
+  document.getElementById('aiProgressText').textContent = '✅ Génération terminée !';
+  document.getElementById('aiProgressSub').textContent = 'Vérifiez et complétez si besoin, puis cliquez sur "Générer mes documents".';
+
+  await new Promise(r => setTimeout(r, 800));
+  overlay.style.display = 'none';
+  btn.disabled = false;
+
+  // Afficher les accordéons pour relecture/complétion
+  document.getElementById('treatmentsDetails').style.display = 'block';
+
+  // Changer le bouton en "Générer les documents"
+  btn.textContent = '✅ Générer mes documents →';
+  btn.onclick = () => {
+    setStep(3);
+    generateDocuments();
+    saveToStorage();
+  };
+
+  // Scroll vers les accordéons
+  document.getElementById('treatmentsDetails').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function updateAiGenerateAllBtn() {} // conservé pour compatibilité
+
+function getOutilsListe() {
+  const map = {
+    outil_google: 'Google Workspace / Gmail',
+    outil_microsoft: 'Microsoft 365 / Teams',
+    outil_stripe: 'Stripe / PayPal',
+    outil_mailchimp: 'Mailchimp / Brevo',
+    outil_crm: 'CRM (HubSpot/Salesforce)',
+    outil_compta: 'Logiciel comptable (Sage/Cegid)',
+    outil_rh: 'Logiciel RH/paie (Silae/PayFit)',
+    outil_analytics: 'Google Analytics',
+    outil_cloud: 'Hébergement cloud (AWS/OVH)',
+    outil_video: 'Vidéosurveillance connectée'
+  };
+  const checked = Object.entries(map).filter(([id]) => document.getElementById(id)?.checked).map(([,label]) => label);
+  const autres = document.getElementById('outilsAutres')?.value.trim();
+  if (autres) checked.push(autres);
+  return checked.join(', ') || 'aucun outil spécifique renseigné';
+}
+
+// ==================== NAF MAPPING ====================
+function mapNAFtoSecteur(naf, section) {
+  // 1. Surveillance : priorité absolue via NAF code 80xx
+  if (naf) {
+    const code = naf.replace(/\./g, '').toUpperCase();
+    const p2 = code.substring(0, 2);
+    if (p2 === "80") return "securite";
+  }
+  // 2. Section INSEE → secteur
+  const sectionMap = {
+    'A': 'agriculture',
+    'B': 'industrie-extractive',
+    'C': 'industrie-manufacturiere',
+    'D': 'energie',
+    'E': 'energie',
+    'F': 'construction',
+    'G': 'commerce',
+    'H': 'transport',
+    'I': 'restauration',
+    'J': 'informatique',
+    'K': 'finance',
+    'L': 'immobilier',
+    'M': 'services-pro',
+    'N': 'services-admin',
+    'O': 'administration',
+    'P': 'enseignement',
+    'Q': 'sante',
+    'R': 'arts-loisirs',
+    'S': 'autres-services',
+    'T': 'autres-services',
+    'U': 'autre',
+  };
+  if (section && sectionMap[section]) return sectionMap[section];
+  // 3. Fallback NAF si pas de section
+  if (naf) {
+    const code = naf.replace(/\./g, '').toUpperCase();
+    const p2 = code.substring(0, 2);
+    const nafMap = {
+      '01':'agriculture','02':'agriculture','03':'agriculture',
+      '05':'industrie-extractive','06':'industrie-extractive','07':'industrie-extractive','08':'industrie-extractive','09':'industrie-extractive',
+      '10':'industrie-manufacturiere','11':'industrie-manufacturiere','12':'industrie-manufacturiere','13':'industrie-manufacturiere','14':'industrie-manufacturiere','15':'industrie-manufacturiere','16':'industrie-manufacturiere','17':'industrie-manufacturiere','18':'industrie-manufacturiere','19':'industrie-manufacturiere','20':'industrie-manufacturiere','21':'industrie-manufacturiere','22':'industrie-manufacturiere','23':'industrie-manufacturiere','24':'industrie-manufacturiere','25':'industrie-manufacturiere','26':'industrie-manufacturiere','27':'industrie-manufacturiere','28':'industrie-manufacturiere','29':'industrie-manufacturiere','30':'industrie-manufacturiere','31':'industrie-manufacturiere','32':'industrie-manufacturiere','33':'industrie-manufacturiere',
+      '35':'energie','36':'energie','37':'energie','38':'energie','39':'energie',
+      '41':'construction','42':'construction','43':'construction',
+      '45':'commerce','46':'commerce','47':'commerce',
+      '49':'transport','50':'transport','51':'transport','52':'transport','53':'transport',
+      '55':'restauration','56':'restauration',
+      '58':'informatique','59':'informatique','60':'informatique','61':'informatique','62':'informatique','63':'informatique',
+      '64':'finance','65':'finance','66':'finance',
+      '68':'immobilier',
+      '69':'services-pro','70':'services-pro','71':'services-pro','72':'services-pro','73':'services-pro','74':'services-pro','75':'services-pro',
+      '77':'services-admin','78':'services-admin','79':'services-admin','81':'services-admin','82':'services-admin',
+      '84':'administration',
+      '85':'enseignement',
+      '86':'sante','87':'sante','88':'sante',
+      '90':'arts-loisirs','91':'arts-loisirs','92':'arts-loisirs','93':'arts-loisirs',
+      '94':'autres-services','95':'autres-services','96':'autres-services',
+    };
+    if (nafMap[p2]) return nafMap[p2];
+  }
+  return "autre";
+}
+
+function mapFormeJuridique(code) {
+  if (!code) return "";
+  const c = String(code).trim();
+  // Correspondance exacte 4 chiffres
+  const exact = {
+    "5499": "SARL", "5498": "EURL", "5710": "SAS", "5720": "SASU",
+    "5599": "SA", "5202": "SNC", "9220": "Association",
+    "1000": "EI", "1100": "EI", "1200": "EI"
+  };
+  if (exact[c]) return exact[c];
+  // Fallback préfixe 2 chiffres
+  const p2 = c.substring(0, 2);
+  if (p2 === "92") return "Association";
+  if (["10","11","12"].includes(p2)) return "EI";
+  if (p2 === "54") return "SARL";
+  if (p2 === "57") return "SAS";
+  if (p2 === "55") return "SA";
+  return "";
+}
+
+// ==================== API DATA.GOUV.FR ====================
+let abortCtrl = null;
+
+async function searchEntreprises(q) {
+  if (abortCtrl) abortCtrl.abort();
+  abortCtrl = new AbortController();
+  document.getElementById('searchSpinner').style.display = 'block';
+  try {
+    const url = `https://recherche-entreprises.api.gouv.fr/search?q=${encodeURIComponent(q)}&limit=5`;
+    const resp = await fetch(url, { signal: abortCtrl.signal });
+    if (!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    apiAvailable = true;
+    document.getElementById('apiOffline').style.display = 'none';
+    showSuggestions(data.results || []);
+  } catch(e) {
+    if (e.name === 'AbortError') return;
+    apiAvailable = false;
+    document.getElementById('apiOffline').style.display = 'block';
+    document.getElementById('suggestions').innerHTML = '';
+  } finally {
+    document.getElementById('searchSpinner').style.display = 'none';
+  }
+}
+
+function showSuggestions(results) {
+  const box = document.getElementById('suggestions');
+  if (!results.length) { box.innerHTML = ''; return; }
+  box.innerHTML = results.map((r, i) => {
+    const siege = r.siege || {};
+    const nom = r.nom_complet || r.nom_raison_sociale || '';
+    const siret = siege.siret || '';
+    const adresse = siege.adresse || [siege.code_postal, siege.libelle_commune].filter(Boolean).join(' ');
+    return `<div class="suggestion-item" onclick="selectSuggestion(${i})" data-idx="${i}">
+      <div class="suggestion-name">${escHtml(nom)}</div>
+      <div class="suggestion-details">SIRET: ${escHtml(siret)} — ${escHtml(adresse)}</div>
+    </div>`;
+  }).join('');
+  box._results = results;
+}
+
+function selectSuggestion(idx) {
+  const box = document.getElementById('suggestions');
+  const r = box._results[idx];
+  if (!r) return;
+  const siege = r.siege || {};
+
+  document.getElementById('raisonSociale').value = r.nom_complet || r.nom_raison_sociale || '';
+  document.getElementById('siret').value = siege.siret || '';
+
+  const fj = mapFormeJuridique(r.nature_juridique || '');
+  if (fj) {
+    const sel = document.getElementById('formeJuridique');
+    for (let opt of sel.options) { if (opt.value === fj) { sel.value = fj; break; } }
+  }
+
+  // L'API retourne maintenant un champ adresse unique
+  document.getElementById('adresse').value = siege.adresse || [siege.code_postal, siege.libelle_commune].filter(Boolean).join(' ');
+
+  const naf = siege.activite_principale || r.activite_principale || '';
+  const section = r.section_activite_principale || '';
+  const secteur = mapNAFtoSecteur(naf, section);
+  if (secteur) {
+    setSelectVal('secteur', secteur);
+    onSecteurChange(secteur);
+  }
+
+  // Vérification entreprise active
+  if (r.etat_administratif && r.etat_administratif !== 'A') {
+    const existing = document.querySelector('.closed-badge');
+    if (!existing) {
+      const badge = document.createElement('div');
+      badge.className = 'alert alert-error mt-2';
+      badge.innerHTML = '⚠️ Cette entreprise est <strong>fermée ou radiée</strong> selon les données officielles (état administratif : ' + escHtml(r.etat_administratif) + ').';
+      document.getElementById('raisonSociale').closest('.card').appendChild(badge);
+    }
+  }
+
+  document.getElementById('suggestions').innerHTML = '';
+  document.getElementById('searchInput').value = '';
+
+  // Afficher le résumé entreprise
+  const nom = r.nom_complet || r.nom_raison_sociale || '';
+  const siretVal = siege.siret || '';
+  const adresseVal = siege.adresse || [siege.code_postal, siege.libelle_commune].filter(Boolean).join(' ');
+  const secteurVal = document.getElementById('secteur').value;
+  const secteurLabel = document.getElementById('secteur').options[document.getElementById('secteur').selectedIndex]?.text || '';
+  document.getElementById('cs_nom').textContent = nom;
+  document.getElementById('cs_details').textContent = [
+    siretVal ? 'SIRET : ' + siretVal : '',
+    adresseVal,
+    secteurLabel ? 'Secteur : ' + secteurLabel : ''
+  ].filter(Boolean).join(' · ');
+  document.getElementById('companySummary').style.display = 'block';
+  document.getElementById('manualCompanyFields').style.display = 'none';
+  document.getElementById('err_raisonSociale_search').classList.add('hidden');
+
+  saveToStorage();
+}
+
+function resetCompanySearch() {
+  document.getElementById('companySummary').style.display = 'none';
+  document.getElementById('manualCompanyFields').style.display = 'block';
+  document.getElementById('raisonSocialeManual').value = document.getElementById('raisonSociale').value;
+  document.getElementById('siretManual').value = document.getElementById('siret').value;
+  document.getElementById('adresseManual').value = document.getElementById('adresse').value;
+}
+
+// ==================== ÉTAPES ====================
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('step'+i).classList.toggle('hidden', i !== n);
+    const numEl = document.getElementById('snum'+i);
+    const lblEl = document.getElementById('slbl'+i);
+    if (i < n) {
+      numEl.className = 'step-num done'; numEl.textContent = '✓';
+      lblEl.className = 'step-label done';
+    } else if (i === n) {
+      numEl.className = 'step-num active'; numEl.textContent = i;
+      lblEl.className = 'step-label active';
+    } else {
+      numEl.className = 'step-num'; numEl.textContent = i;
+      lblEl.className = 'step-label';
+    }
+    if (i < 3) {
+      document.getElementById('sc'+i).className = 'step-connector' + (i < n ? ' done' : '');
+    }
+  });
+  currentStep = n;
+  window.scrollTo(0, 0);
+}
+
+async function nextStep(from) {
+  if (from === 1) {
+    if (!validateStep1()) return;
+    // Auto-cocher mesures de sécurité selon secteur
+    autoSetSecurite();
+    setStep(2);
+    renderTreatments();
+  } else if (from === 2) {
+    const checked = TREATMENTS_LIST.filter(t => treatmentData[t.id] !== undefined);
+    if (!checked.length) { alert('Cochez au moins un type de données.'); return; }
+    if (claudeApiValid) {
+      await autoGenerateAndProceed();
+    } else {
+      setStep(3);
+      generateDocuments();
+    }
+  }
+  saveToStorage();
+}
+
+function autoSetSecurite() {
+  const s = document.getElementById('secteur').value;
+  setCk('sec_mdp', true);
+  setCk('sec_antivirus', true);
+  setCk('sec_acces', true);
+  setCk('sec_sauvegardes', true);
+  setCk('sec_chiffrement', ['sante','finance','securite'].includes(s));
+  setCk('sec_formation', ['sante','finance','securite','administration'].includes(s));
+  setCk('sec_contrats', true);
+}
+
+function prevStep(from) {
+  setStep(from - 1);
+  // Remettre le bouton étape 2 à son état initial
+  if (from === 3) {
+    const btn = document.getElementById('step2NextBtn');
+    if (btn) {
+      btn.textContent = 'Générer mes documents RGPD →';
+      btn.onclick = () => nextStep(2);
+    }
+  }
+}
+
+// ==================== VALIDATION ====================
+function validateStep1() {
+  let valid = true;
+
+  // Entreprise : soit via recherche, soit via saisie manuelle
+  const raisonVal = document.getElementById('raisonSociale').value.trim();
+  const siretVal = document.getElementById('siret').value.trim();
+  const searchErr = document.getElementById('err_raisonSociale_search');
+  if (!raisonVal || !siretVal) {
+    searchErr.classList.remove('hidden'); valid = false;
+  } else {
+    searchErr.classList.add('hidden');
+  }
+
+  // Si saisie manuelle visible, vérifier secteur
+  const manualVisible = document.getElementById('manualCompanyFields').style.display !== 'none';
+  if (manualVisible) {
+    const secteurEl = document.getElementById('secteur');
+    const secteurErr = document.getElementById('err_secteur');
+    if (!secteurEl.value) {
+      secteurErr.classList.remove('hidden'); valid = false;
+    } else {
+      secteurErr.classList.add('hidden');
+    }
+  }
+
+  // Responsable légal
+  const respEl = document.getElementById('responsableLegal');
+  const respErr = document.getElementById('err_responsableLegal');
+  if (!respEl.value.trim()) {
+    respEl.classList.add('error'); respErr.classList.remove('hidden'); valid = false;
+  } else {
+    respEl.classList.remove('error'); respErr.classList.add('hidden');
+  }
+
+  // Email RGPD
+  const emailEl = document.getElementById('emailRGPD');
+  const emailErr = document.getElementById('err_emailRGPD');
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim());
+  if (!emailOk) {
+    emailEl.classList.add('error'); emailErr.classList.remove('hidden'); valid = false;
+  } else {
+    emailEl.classList.remove('error'); emailErr.classList.add('hidden');
+  }
+
+  // DPO obligatoire si secteur sensible
+  if (checkDpoRequired() && document.getElementById('dpoNon').checked) {
+    const msgEl = document.getElementById('dpoRequiredMsg');
+    msgEl.style.color = '#c0392b';
+    msgEl.innerHTML = '⚠️ <strong>Obligatoire</strong> pour votre secteur : vous devez désigner un DPO.';
+    valid = false;
+  }
+  return valid;
+}
+
+// ==================== SECTEUR ====================
+function onSecteurChange(val) {
+  const s = val || document.getElementById('secteur').value;
+  const alertEl = document.getElementById('alertSurveillance');
+  alertEl.classList.toggle('hidden', s !== 'securite');
+  if (s === 'securite' && currentStep === 2) {
+    autoCheckSurveillance();
+  }
+  if (s) checkDpoRequired();
+}
+
+function autoCheckSurveillance() {
+  const toCheck = ['videosurveillance','fichier_clients','enregistrement_appels','geolocalisation','facturation'];
+  toCheck.forEach(id => {
+    const cb = document.getElementById('chk_' + id);
+    if (cb && !cb.checked) { cb.checked = true; toggleTreatment(id, true); }
+  });
+}
+
+// ==================== TRAITEMENTS ====================
+function renderTreatments() {
+  const grid = document.getElementById('treatmentsGrid');
+  grid.innerHTML = TREATMENTS_LIST.map(t => `
+    <label class="treatment-check ${treatmentData[t.id] ? 'checked' : ''}" id="lbl_${t.id}">
+      <input type="checkbox" id="chk_${t.id}" ${treatmentData[t.id] ? 'checked' : ''}
+        onchange="toggleTreatment('${t.id}', this.checked)">
+      <span class="treatment-check-label">${escHtml(t.label)}</span>
+    </label>
+  `).join('');
+
+  renderTreatmentDetails();
+
+  const secteur = document.getElementById('secteur').value;
+  if (secteur === 'securite') {
+    autoCheckSurveillance();
+  }
+}
+
+function toggleTreatment(id, checked) {
+  const lbl = document.getElementById('lbl_' + id);
+  if (lbl) lbl.classList.toggle('checked', checked);
+
+  if (checked) {
+    if (!treatmentData[id]) {
+      const fiche = CNIL_FICHES[id];
+      if (fiche) {
+        treatmentData[id] = {
+          finalite: { value: fiche.finalite, modified: false },
+          base_legale: { value: fiche.base_legale, modified: false },
+          personnes_concernees: { value: fiche.personnes_concernees, modified: false },
+          categories_donnees: { value: fiche.categories_donnees, modified: false },
+          duree_conservation: { value: fiche.duree_conservation, modified: false },
+          destinataires: { value: fiche.destinataires, modified: false },
+          sous_traitants: { value: fiche.sous_traitants_types, modified: false },
+          transfert_hors_ue: { value: fiche.transfert_hors_ue ? 'oui' : 'non', modified: false },
+          transfert_detail: { value: fiche.transfert_detail || '', modified: false },
+        };
+      } else {
+        treatmentData[id] = {};
+      }
+    }
+  } else {
+    delete treatmentData[id];
+  }
+  renderTreatmentDetails();
+  updateAiGenerateAllBtn();
+  saveToStorage();
+}
+
+function renderTreatmentDetails() {
+  const container = document.getElementById('treatmentsDetails');
+  const checked = TREATMENTS_LIST.filter(t => treatmentData[t.id] !== undefined);
+
+  container.innerHTML = checked.map(t => {
+    const fiche = CNIL_FICHES[t.id];
+    if (!fiche) {
+      return `<div class="accordion" id="acc_${t.id}">
+        <div class="accordion-header" onclick="toggleAccordion('${t.id}')">
+          📋 ${escHtml(t.label)} <span class="accordion-chevron" id="chev_${t.id}">▼</span>
+        </div>
+        <div class="accordion-body" id="body_${t.id}">
+          <div class="alert alert-warning">⚠️ Ce type de traitement (${escHtml(t.label)}) nécessite une attention particulière. Décrivez manuellement ce traitement ci-dessous.</div>
+          <div class="field mt-1"><label>Description du traitement</label><textarea placeholder="Décrivez vos pratiques..."></textarea></div>
+        </div>
+      </div>`;
+    }
+    const d = treatmentData[t.id] || {};
+    return `<div class="accordion" id="acc_${t.id}">
+      <div class="accordion-header" onclick="toggleAccordion('${t.id}')">
+        📋 ${escHtml(fiche.nom)} <span class="accordion-chevron" id="chev_${t.id}">▼</span>
+      </div>
+      <div class="accordion-body" id="body_${t.id}">
+        <div class="form-grid">
+          ${renderTField(t.id, 'finalite', 'Finalité', 'textarea', d)}
+          ${renderTField(t.id, 'base_legale', 'Base légale', 'select_bl', d)}
+          ${renderTField(t.id, 'duree_conservation', 'Durée de conservation', 'textarea', d)}
+          ${renderTField(t.id, 'destinataires', 'Destinataires', 'textarea', d)}
+        </div>
+        <details style="margin-top:.75rem">
+          <summary style="cursor:pointer;font-size:.82rem;color:var(--primary);font-weight:600;user-select:none">⚙️ Paramètres avancés (pré-remplis automatiquement)</summary>
+          <div class="form-grid" style="margin-top:.75rem">
+            ${renderTField(t.id, 'personnes_concernees', 'Personnes concernées', 'textarea', d)}
+            ${renderTField(t.id, 'categories_donnees', 'Catégories de données', 'textarea', d)}
+            ${renderTField(t.id, 'sous_traitants', 'Sous-traitants impliqués', 'textarea', d)}
+            <div class="field">
+              <label>Transfert hors UE ? ${cnilBadge(d.transfert_hors_ue)}</label>
+              <select id="tf_${t.id}_transfert_hors_ue" onchange="onTFieldChange('${t.id}','transfert_hors_ue',this.value)">
+                <option value="non" ${(d.transfert_hors_ue?.value||'non')==='non'?'selected':''}>Non</option>
+                <option value="oui" ${(d.transfert_hors_ue?.value||'non')==='oui'?'selected':''}>Oui</option>
+              </select>
+            </div>
+            <div class="field" id="tf_detail_${t.id}" style="${(d.transfert_hors_ue?.value||'non')==='oui'?'':'display:none'}">
+              <label>Pays et garantie du transfert ${cnilBadge(d.transfert_detail)}</label>
+              <input type="text" id="tf_${t.id}_transfert_detail" value="${escAttr(d.transfert_detail?.value||'')}" onchange="onTFieldChange('${t.id}','transfert_detail',this.value)" oninput="markModified('${t.id}','transfert_detail',this)">
+            </div>
+          </div>
+        </details>
+        ${fiche.mentions_specifiques ? `<div class="alert alert-info mt-2">ℹ️ <strong>Points d'attention CNIL :</strong> ${escHtml(fiche.mentions_specifiques)}</div>` : ''}
+        <a href="https://cnil.fr/fr/les-fiches-pratiques-rgpd" target="_blank" class="cnil-link">📖 Voir la fiche CNIL complète →</a>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Update show/hide transfer detail
+  checked.forEach(t => {
+    if (CNIL_FICHES[t.id]) {
+      const d = treatmentData[t.id] || {};
+      const detailEl = document.getElementById('tf_detail_' + t.id);
+      if (detailEl) detailEl.style.display = (d.transfert_hors_ue?.value||'non')==='oui' ? '' : 'none';
+    }
+  });
+}
+
+function renderTField(treatId, field, label, type, d) {
+  const fd = d[field] || {};
+  const val = fd.value || '';
+  const badge = cnilBadge(fd);
+  const mandatory = ['finalite','base_legale','duree_conservation','destinataires'].includes(field);
+
+  // Suggestions cliquables
+  const suggs = (FIELD_SUGGESTIONS[treatId] || {})[field] || [];
+  const chipsHtml = suggs.length ? `<div class="suggestions-chips">${suggs.map(s =>
+    `<span class="chip" onclick="applyChip('${treatId}','${field}',this)">💡 ${escHtml(s)}</span>`
+  ).join('')}</div>` : '';
+
+  // Bouton IA
+  const aiBtn = claudeApiValid ? `<button class="ai-btn" onclick="generateWithAI('${treatId}','${field}',this)">✨ Générer avec l'IA</button>` : '';
+
+  const labelHtml = `<label style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.35rem">
+    <span>${escHtml(label)} ${badge}${mandatory ? ' <span style="color:var(--red)">*</span>' : ''}</span>
+    ${aiBtn}
+  </label>`;
+
+  if (type === 'textarea') {
+    return `<div class="field span2">
+      ${labelHtml}
+      <textarea id="tf_${treatId}_${field}" onchange="onTFieldChange('${treatId}','${field}',this.value)" oninput="markModified('${treatId}','${field}',this)">${escHtml(val)}</textarea>
+      ${chipsHtml}
+    </div>`;
+  }
+  if (type === 'select_bl') {
+    const opts = ['Consentement (Art. 6.1.a)', 'Exécution du contrat (Art. 6.1.b)', 'Obligation légale (Art. 6.1.c)', "Intérêt légitime (Art. 6.1.f RGPD)", 'Autre'];
+    return `<div class="field span2">
+      ${labelHtml}
+      <input type="text" id="tf_${treatId}_${field}" value="${escAttr(val)}" onchange="onTFieldChange('${treatId}','${field}',this.value)" oninput="markModified('${treatId}','${field}',this)" list="bl_list_${treatId}">
+      <datalist id="bl_list_${treatId}">${opts.map(o=>`<option value="${escAttr(o)}">`).join('')}</datalist>
+      ${chipsHtml}
+    </div>`;
+  }
+  return '';
+}
+
+function applyChip(treatId, field, chipEl) {
+  const text = chipEl.textContent.replace(/^💡\s*/, '').trim();
+  const el = document.getElementById('tf_' + treatId + '_' + field);
+  if (!el) return;
+  el.value = text;
+  onTFieldChange(treatId, field, text);
+  if (!treatmentData[treatId]) treatmentData[treatId] = {};
+  if (!treatmentData[treatId][field]) treatmentData[treatId][field] = {};
+  treatmentData[treatId][field].value = text;
+  treatmentData[treatId][field].modified = true;
+}
+
+function cnilBadge(fd) {
+  if (!fd || (!fd.value && fd.value !== false)) return '';
+  if (fd.modified) return '<span class="cnil-badge modified">✏️ Modifié</span>';
+  return '<span class="cnil-badge source">📋 Exemple CNIL</span>';
+}
+
+function onTFieldChange(treatId, field, value) {
+  if (!treatmentData[treatId]) treatmentData[treatId] = {};
+  if (!treatmentData[treatId][field]) treatmentData[treatId][field] = {};
+  treatmentData[treatId][field].value = value;
+  // Show/hide transfer detail
+  if (field === 'transfert_hors_ue') {
+    const detailEl = document.getElementById('tf_detail_' + treatId);
+    if (detailEl) detailEl.style.display = value === 'oui' ? '' : 'none';
+  }
+  saveToStorage();
+}
+
+function markModified(treatId, field, el) {
+  if (!treatmentData[treatId]) return;
+  if (!treatmentData[treatId][field]) treatmentData[treatId][field] = {};
+  const fiche = CNIL_FICHES[treatId];
+  if (!fiche) return;
+  const original = fiche[field] || (field === 'transfert_hors_ue' ? (fiche.transfert_hors_ue ? 'oui' : 'non') : (fiche.transfert_detail || ''));
+  const isModified = el.value !== original && el.value !== (typeof original === 'boolean' ? (original ? 'oui' : 'non') : original);
+  treatmentData[treatId][field].modified = isModified;
+  // Update badge in label
+  const lbl = el.closest('.field')?.querySelector('label');
+  if (lbl) {
+    const existing = lbl.querySelector('.cnil-badge');
+    if (existing) existing.outerHTML = cnilBadge(treatmentData[treatId][field]);
+  }
+}
+
+function toggleAccordion(id) {
+  const body = document.getElementById('body_' + id);
+  const chev = document.getElementById('chev_' + id);
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+
+// ==================== GÉNÉRATION DOCUMENTS ====================
+function generateDocuments() {
+  const info = getFormData();
+  const today = formatDate(new Date());
+  const docs = document.getElementById('documents');
+
+  docs.innerHTML = `
+    ${genDoc1(info, today)}
+    ${genDoc2(info, today)}
+    ${genDoc3(info, today)}
+    ${genDoc4(info, today)}
+  `;
+}
+
+function getFormData() {
+  const dpoOui = document.getElementById('dpoOui').checked;
+  return {
+    raisonSociale: v('raisonSociale'),
+    siret: v('siret'),
+    formeJuridique: v('formeJuridique'),
+    secteur: v('secteur'),
+    adresse: v('adresse'),
+    responsableLegal: v('responsableLegal'),
+    emailRGPD: v('emailRGPD'),
+    outilsAmericains: document.getElementById('outil_google')?.checked || document.getElementById('outil_microsoft')?.checked || document.getElementById('outil_stripe')?.checked || document.getElementById('outil_mailchimp')?.checked || document.getElementById('outil_crm')?.checked || document.getElementById('outil_analytics')?.checked || false,
+    outilsListe: getOutilsListe(),
+    hasDpo: dpoOui,
+    dpoNom: v('dpoNom'),
+    dpoEmail: v('dpoEmail'),
+    securite: {
+      mdp: ck('sec_mdp'), antivirus: ck('sec_antivirus'), chiffrement: ck('sec_chiffrement'),
+      acces: ck('sec_acces'), sauvegardes: ck('sec_sauvegardes'), formation: ck('sec_formation'), contrats: ck('sec_contrats')
+    }
+  };
+}
+
+function genDoc1(info, today) {
+  const rows = Object.entries(treatmentData).map(([id, d]) => {
+    const fiche = CNIL_FICHES[id] || {};
+    const label = TREATMENTS_LIST.find(t=>t.id===id)?.label || id;
+    const sec = getSecMesures(info.securite);
+    return `<tr>
+      <td><strong>${escHtml(fiche.nom || label)}</strong></td>
+      <td>${escHtml(info.raisonSociale)}<br><small>${escHtml(info.responsableLegal)}</small></td>
+      <td>${escHtml(d.finalite?.value || fiche.finalite || '')}</td>
+      <td>${escHtml(d.base_legale?.value || fiche.base_legale || '')}</td>
+      <td>${escHtml(d.personnes_concernees?.value || fiche.personnes_concernees || '')}</td>
+      <td>${escHtml(d.categories_donnees?.value || fiche.categories_donnees || '')}</td>
+      <td>${escHtml(d.destinataires?.value || fiche.destinataires || '')}</td>
+      <td>${(d.transfert_hors_ue?.value||'non')==='oui' ? '🌍 Oui — ' + escHtml(d.transfert_detail?.value||'') : '🇪🇺 Non'}</td>
+      <td>${escHtml(d.duree_conservation?.value || fiche.duree_conservation || '')}</td>
+      <td>${escHtml(sec)}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="doc-section">
+    <div class="doc-header">
+      <div class="doc-title">📊 Document 1 — Registre des activités de traitement (Art. 30 RGPD)</div>
+      <button class="btn btn-outline btn-sm" onclick="copyDoc('doc1content')">📋 Copier</button>
+    </div>
+    <div class="doc-content" id="doc1content" style="overflow-x:auto">
+      <p><strong>${escHtml(info.raisonSociale)}</strong> — ${escHtml(info.formeJuridique)} — SIRET : ${escHtml(info.siret)}<br>
+      Responsable du traitement : ${escHtml(info.responsableLegal)} — ${escHtml(info.emailRGPD)}<br>
+      ${info.hasDpo ? `DPO : ${escHtml(info.dpoNom)} — ${escHtml(info.dpoEmail)}<br>` : ''}
+      Version : v1.0 — Date : ${today}</p>
+      <br>
+      <table class="doc-table">
+        <thead><tr>
+          <th>Traitement</th><th>Responsable</th><th>Finalité</th><th>Base légale</th>
+          <th>Personnes concernées</th><th>Catégories de données</th><th>Destinataires</th>
+          <th>Transfert hors UE</th><th>Durée de conservation</th><th>Mesures de sécurité</th>
+        </tr></thead>
+        <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:var(--gray-text)">Aucun traitement sélectionné</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function genDoc2(info, today) {
+  const traitementsList = Object.entries(treatmentData).map(([id, d]) => {
+    const fiche = CNIL_FICHES[id] || {};
+    const label = TREATMENTS_LIST.find(t=>t.id===id)?.label || id;
+    return `<h4 style="margin-top:1rem">${escHtml(fiche.nom || label)}</h4>
+<p><strong>Finalité :</strong> ${escHtml(d.finalite?.value || fiche.finalite || '')}</p>
+<p><strong>Base légale :</strong> ${escHtml(d.base_legale?.value || fiche.base_legale || '')}</p>
+<p><strong>Durée de conservation :</strong> ${escHtml(d.duree_conservation?.value || fiche.duree_conservation || '')}</p>
+<p><strong>Destinataires :</strong> ${escHtml(d.destinataires?.value || fiche.destinataires || '')}</p>
+${(d.transfert_hors_ue?.value||'non')==='oui' ? `<p><strong>Transfert hors UE :</strong> ${escHtml(d.transfert_detail?.value||'')}</p>` : ''}`;
+  }).join('');
+
+  const contactDpo = info.hasDpo
+    ? `ou à notre DPO : ${escHtml(info.dpoNom)} — ${escHtml(info.dpoEmail)}`
+    : '';
+
+  const text = `<h3>POLITIQUE DE CONFIDENTIALITÉ</h3>
+<p><em>Version 1.0 — Date de mise à jour : ${today}</em></p>
+
+<h4>1. Identité du Responsable du traitement</h4>
+<p>${escHtml(info.raisonSociale)} (${escHtml(info.formeJuridique)})<br>
+SIRET : ${escHtml(info.siret)}<br>
+Adresse : ${escHtml(info.adresse)}<br>
+Responsable légal : ${escHtml(info.responsableLegal)}<br>
+Contact RGPD : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a>
+${info.hasDpo ? `<br>Délégué à la Protection des Données (DPO) : ${escHtml(info.dpoNom)} — <a href="mailto:${escHtml(info.dpoEmail)}">${escHtml(info.dpoEmail)}</a>` : ''}</p>
+
+<h4>2. Données collectées et finalités</h4>
+<p>Nous collectons et traitons des données personnelles dans le cadre des activités suivantes :</p>
+${traitementsList || '<p>Aucun traitement renseigné.</p>'}
+
+<h4>3. Vos droits</h4>
+<p>Conformément au RGPD (Règlement UE 2016/679) et à la loi Informatique et Libertés, vous disposez des droits suivants :</p>
+<ul>
+<li><strong>Droit d'accès</strong> : obtenir une copie des données vous concernant</li>
+<li><strong>Droit de rectification</strong> : corriger des données inexactes ou incomplètes</li>
+<li><strong>Droit à l'effacement</strong> : demander la suppression de vos données ("droit à l'oubli")</li>
+<li><strong>Droit à la portabilité</strong> : recevoir vos données dans un format structuré</li>
+<li><strong>Droit d'opposition</strong> : vous opposer à certains traitements, notamment la prospection</li>
+<li><strong>Droit à la limitation</strong> : demander la suspension d'un traitement</li>
+</ul>
+
+<h4>4. Exercer vos droits</h4>
+<p>Pour exercer vos droits, contactez-nous à : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a> ${contactDpo}<br>
+Nous nous engageons à répondre dans un délai d'un mois à compter de la réception de votre demande.</p>
+
+<h4>5. Réclamation auprès de la CNIL</h4>
+<p>Si vous estimez que vos droits ne sont pas respectés, vous avez le droit d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) :<br>
+<a href="https://www.cnil.fr/fr/plaintes" target="_blank">www.cnil.fr/fr/plaintes</a><br>
+CNIL — 3 Place de Fontenoy — TSA 80715 — 75334 Paris Cedex 07<br>
+Tél. : 01 53 73 22 22</p>
+
+<h4>6. Sécurité</h4>
+<p>Nous mettons en œuvre les mesures techniques et organisationnelles appropriées pour assurer la sécurité de vos données : ${escHtml(getSecMesures(info.securite))}.</p>`;
+
+  return `<div class="doc-section">
+    <div class="doc-header">
+      <div class="doc-title">📄 Document 2 — Politique de Confidentialité</div>
+      <button class="btn btn-outline btn-sm" onclick="copyDoc('doc2content')">📋 Copier</button>
+    </div>
+    <div class="doc-content" id="doc2content">${text}
+    </div>
+  </div>`;
+}
+
+function genDoc3(info, today) {
+  const text = `<h3>PROCÉDURE DE GESTION DES VIOLATIONS DE DONNÉES PERSONNELLES</h3>
+<p><em>${escHtml(info.raisonSociale)} — Version 1.0 — ${today}</em></p>
+
+<h4>1. Définition d'une violation de données</h4>
+<p>Une violation de données personnelles est une violation de la sécurité entraînant, de manière accidentelle ou illicite, la <strong>destruction, la perte, l'altération, la divulgation non autorisée</strong> de données personnelles transmises, conservées ou traitées, ou l'accès non autorisé à de telles données.</p>
+<p>Exemples : ransomware, accès non autorisé, envoi par erreur, perte d'ordinateur portable, base de données exposée.</p>
+
+<h4>2. Checklist des actions dans les 72 heures</h4>
+<p><strong>⏱️ DÉLAI LÉGAL : notification à la CNIL dans les 72h après avoir eu connaissance de la violation (Art. 33 RGPD)</strong></p>
+<ul>
+<li>☐ <strong>H+0 :</strong> Identifier et documenter la violation (date, nature, données concernées, personnes affectées)</li>
+<li>☐ <strong>H+0 :</strong> Contenir la violation (bloquer l'accès, changer les mots de passe, isoler les systèmes)</li>
+<li>☐ <strong>H+2 :</strong> Évaluer le risque pour les personnes concernées (faible / élevé)</li>
+<li>☐ <strong>H+4 :</strong> Informer la direction et ${info.hasDpo ? `le DPO (${escHtml(info.dpoNom)})` : "le responsable RGPD"}</li>
+<li>☐ <strong>H+24 :</strong> Préparer la notification CNIL si le risque est avéré</li>
+<li>☐ <strong>H+48 :</strong> Si risque élevé : préparer la notification aux personnes concernées</li>
+<li>☐ <strong>H+72 :</strong> Notifier la CNIL via le portail officiel</li>
+<li>☐ Consigner la violation dans le registre interne des violations</li>
+</ul>
+
+<h4>3. Notification à la CNIL</h4>
+<p>La notification est obligatoire sauf si la violation n'est pas susceptible d'engendrer un risque pour les droits et libertés des personnes.</p>
+<p>📎 <strong>Portail officiel de notification :</strong> <a href="https://notifications.cnil.fr/notifications/index" target="_blank">notifications.cnil.fr/notifications/index</a></p>
+<p>Informations à fournir : nature de la violation, catégories de données, nombre approximatif de personnes, conséquences probables, mesures prises.</p>
+
+<h4>4. Modèle de notification aux personnes concernées</h4>
+<p><em>(À utiliser si la violation est susceptible d'engendrer un risque élevé)</em></p>
+<blockquote style="border-left:3px solid var(--blue);padding-left:1rem;margin:1rem 0;color:#374151">
+Objet : Information importante concernant la sécurité de vos données personnelles<br><br>
+Madame, Monsieur,<br><br>
+Nous vous informons qu'une violation de données personnelles vous concernant a été détectée le [DATE]. Cette violation a affecté [DÉCRIRE BRIÈVEMENT : ex. votre adresse email, vos coordonnées].<br><br>
+<strong>Nature de l'incident :</strong> [décrire]<br>
+<strong>Données concernées :</strong> [lister]<br>
+<strong>Mesures prises :</strong> [décrire les actions correctives]<br><br>
+Nous vous recommandons de [RECOMMANDATIONS : ex. changer votre mot de passe, être vigilant face aux tentatives de phishing].<br><br>
+Pour toute question : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a><br><br>
+Cordialement,<br>${escHtml(info.responsableLegal)}<br>${escHtml(info.raisonSociale)}
+</blockquote>
+
+<h4>5. Registre interne des violations</h4>
+<p>Toute violation, même non notifiée à la CNIL, doit être consignée en interne avec : date, description, données concernées, mesures prises, décision de notification ou non + justification.</p>`;
+
+  return `<div class="doc-section">
+    <div class="doc-header">
+      <div class="doc-title">🚨 Document 3 — Procédure de gestion des violations de données</div>
+      <button class="btn btn-outline btn-sm" onclick="copyDoc('doc3content')">📋 Copier</button>
+    </div>
+    <div class="doc-content" id="doc3content">${text}
+    </div>
+  </div>`;
+}
+
+function genDoc4(info, today) {
+  const traitements = Object.entries(treatmentData).map(([id, d]) => {
+    const fiche = CNIL_FICHES[id] || {};
+    const label = TREATMENTS_LIST.find(t=>t.id===id)?.label || id;
+    return `<li>${escHtml(fiche.nom || label)} — Base légale : ${escHtml(d.base_legale?.value || fiche.base_legale || '')} — Conservation : ${escHtml(d.duree_conservation?.value || fiche.duree_conservation || '')}</li>`;
+  }).join('');
+
+  const html = `<h3>MENTIONS LÉGALES ET INFORMATIONS RGPD</h3>
+<p><em>Bloc HTML prêt à intégrer sur votre site web — ${today}</em></p>
+
+<div style="border:2px dashed var(--gray-border);border-radius:.5rem;padding:1rem;margin:1rem 0;background:var(--gray)">
+<h4>Informations légales</h4>
+<p><strong>Éditeur du site :</strong> ${escHtml(info.raisonSociale)} — ${escHtml(info.formeJuridique)}<br>
+<strong>SIRET :</strong> ${escHtml(info.siret)}<br>
+<strong>Siège social :</strong> ${escHtml(info.adresse)}<br>
+<strong>Représentant légal :</strong> ${escHtml(info.responsableLegal)}<br>
+<strong>Contact :</strong> <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a>
+${info.hasDpo ? `<br><strong>DPO :</strong> ${escHtml(info.dpoNom)} — <a href="mailto:${escHtml(info.dpoEmail)}">${escHtml(info.dpoEmail)}</a>` : ''}</p>
+
+<h4>Protection des données personnelles</h4>
+<p>${escHtml(info.raisonSociale)} collecte et traite des données personnelles conformément au Règlement (UE) 2016/679 (RGPD) et à la loi n°78-17 du 6 janvier 1978 modifiée.</p>
+<p><strong>Traitements mis en œuvre :</strong></p>
+<ul>${traitements || '<li>Aucun traitement renseigné</li>'}</ul>
+
+<h4>Vos droits</h4>
+<p>Conformément au RGPD, vous disposez d'un droit d'accès, de rectification, d'effacement, de portabilité, de limitation et d'opposition concernant vos données personnelles.</p>
+<p>Pour exercer ces droits : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a>${info.hasDpo ? ` ou ${escHtml(info.dpoEmail)}` : ''}</p>
+<p>Vous avez également le droit d'introduire une réclamation auprès de la <a href="https://www.cnil.fr/fr/plaintes" target="_blank">CNIL</a>.</p>
+<p><a href="#">Consulter notre politique de confidentialité complète →</a></p>
+</div>
+
+<h4>Code HTML à copier sur votre site</h4>
+<pre style="background:#1F2937;color:#F9FAFB;padding:1rem;border-radius:.5rem;font-size:.75rem;line-height:1.6;white-space:pre-wrap;word-break:break-all">&lt;section id="mentions-rgpd"&gt;
+  &lt;h2&gt;Informations légales&lt;/h2&gt;
+  &lt;p&gt;&lt;strong&gt;Éditeur :&lt;/strong&gt; ${escHtml(info.raisonSociale)} — SIRET : ${escHtml(info.siret)}&lt;/p&gt;
+  &lt;p&gt;&lt;strong&gt;Responsable :&lt;/strong&gt; ${escHtml(info.responsableLegal)} — &lt;a href="mailto:${escHtml(info.emailRGPD)}"&gt;${escHtml(info.emailRGPD)}&lt;/a&gt;&lt;/p&gt;
+  &lt;h3&gt;Vos droits RGPD&lt;/h3&gt;
+  &lt;p&gt;Accès, rectification, effacement, portabilité, opposition : &lt;a href="mailto:${escHtml(info.emailRGPD)}"&gt;${escHtml(info.emailRGPD)}&lt;/a&gt;&lt;/p&gt;
+  &lt;p&gt;Réclamation CNIL : &lt;a href="https://www.cnil.fr/fr/plaintes"&gt;cnil.fr/fr/plaintes&lt;/a&gt;&lt;/p&gt;
+&lt;/section&gt;</pre>`;
+
+  return `<div class="doc-section">
+    <div class="doc-header">
+      <div class="doc-title">⚖️ Document 4 — Mentions légales RGPD</div>
+      <button class="btn btn-outline btn-sm" onclick="copyDoc('doc4content')">📋 Copier</button>
+    </div>
+    <div class="doc-content" id="doc4content">${html}
+    </div>
+  </div>`;
+}
+
+// ==================== EXPORT PDF ====================
+async function exportPDF() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = '⏳ Génération en cours...';
+
+  const noPdfEls = document.querySelectorAll('.no-pdf');
+  noPdfEls.forEach(el => el.style.display = 'none');
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const margin = 10;
+    const docs = [
+      { id: 'doc1content', orient: 'l', nom: '1_Registre_traitements' },
+      { id: 'doc2content', orient: 'p', nom: '2_Politique_confidentialite' },
+      { id: 'doc3content', orient: 'p', nom: '3_Procedure_violations' },
+      { id: 'doc4content', orient: 'p', nom: '4_Mentions_legales' },
+    ];
+
+    const info = getFormData();
+    const base = info.raisonSociale.replace(/[^a-zA-Z0-9]/g, '_');
+    const date = formatDateFile(new Date());
+
+    for (let i = 0; i < docs.length; i++) {
+      const { id, orient, nom } = docs[i];
+      const el = document.getElementById(id);
+      if (!el) continue;
+
+      const isTable = i === 0;
+
+      // Neutraliser les overflow + forcer word-break
+      const allEls = [el, ...el.querySelectorAll('*')];
+      const saved = allEls.map(e => ({
+        e,
+        ov: e.style.overflow, ox: e.style.overflowX,
+        wb: e.style.wordBreak, ww: e.style.whiteSpace
+      }));
+      allEls.forEach(e => {
+        e.style.overflow = 'visible';
+        e.style.overflowX = 'visible';
+        e.style.wordBreak = 'break-word';
+      });
+
+      // Tableau : réduire police + padding pour tenir sur la largeur paysage
+      const tableEl = el.querySelector('.doc-table');
+      const savedFont = tableEl ? tableEl.style.fontSize : null;
+      const savedCells = [];
+      if (isTable && tableEl) {
+        tableEl.style.fontSize = '7.5px';
+        tableEl.querySelectorAll('th, td').forEach(c => {
+          savedCells.push({ c, p: c.style.padding, wb: c.style.wordBreak });
+          c.style.padding = '3px 4px';
+          c.style.wordBreak = 'break-word';
+        });
+      }
+
+      const renderW = isTable ? 1100 : 900;
+      const canvas = await html2canvas(el, {
+        scale: 1.5, useCORS: true, logging: false,
+        scrollX: 0, scrollY: -window.scrollY,
+        windowWidth: renderW,
+        onclone: (cloneDoc) => {
+          // Dans le clone, s'assurer que tout est visible
+          cloneDoc.querySelectorAll('*').forEach(e => {
+            e.style.overflow = 'visible';
+            e.style.maxHeight = 'none';
+            e.style.height = 'auto';
+          });
+        }
+      });
+
+      // Restaurer
+      saved.forEach(({ e, ov, ox, wb, ww }) => {
+        e.style.overflow = ov;
+        e.style.overflowX = ox;
+        e.style.wordBreak = wb;
+        e.style.whiteSpace = ww;
+      });
+      if (isTable && tableEl) {
+        if (savedFont !== null) tableEl.style.fontSize = savedFont;
+        savedCells.forEach(({ c, p, wb }) => { c.style.padding = p; c.style.wordBreak = wb; });
+      }
+
+      // Créer un PDF individuel pour ce document
+      const pdf = new jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
+      const pgW = pdf.internal.pageSize.getWidth();
+      const pgH = pdf.internal.pageSize.getHeight();
+      const usableW = pgW - margin * 2;
+      const usableH = pgH - margin * 2;
+
+      const imgW = usableW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+
+      if (imgH <= usableH) {
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, imgH);
+      } else {
+        const pxPerMm = canvas.width / imgW;
+        const slicePx = Math.floor(usableH * pxPerMm);
+        let srcY = 0;
+        while (srcY < canvas.height) {
+          const h = Math.min(slicePx, canvas.height - srcY);
+          const slice = document.createElement('canvas');
+          slice.width = canvas.width;
+          slice.height = h;
+          slice.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, h, 0, 0, canvas.width, h);
+          pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, imgW, h / pxPerMm);
+          srcY += h;
+          if (srcY < canvas.height) pdf.addPage('a4', orient);
+        }
+      }
+
+      // Petit délai entre chaque téléchargement pour éviter le blocage navigateur
+      await new Promise(r => setTimeout(r, 400));
+      pdf.save('RGPD_' + base + '_' + nom + '_' + date + '.pdf');
+    } // fin for
+  } catch(e) {
+    alert('Erreur lors de la génération PDF : ' + e.message);
+  } finally {
+    noPdfEls.forEach(el => el.style.display = '');
+    btn.disabled = false;
+    btn.textContent = '⬇️ Exporter en 4 PDF séparés';
+  }
+}
+
+function copyDoc(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ Copié !';
+    setTimeout(() => btn.textContent = '📋 Copier', 2000);
+  });
+}
+
+// ==================== LOCAL STORAGE ====================
+function saveProject() {
+  const info = getFormData();
+  const data = {
+    version: '1.0',
+    savedAt: new Date().toISOString(),
+    raisonSociale: v('raisonSociale'), siret: v('siret'), formeJuridique: v('formeJuridique'),
+    secteur: v('secteur'), adresse: v('adresse'), responsableLegal: v('responsableLegal'),
+    emailRGPD: v('emailRGPD'), outilsListe: getOutilsListe(),
+    outils: { google: ck('outil_google'), microsoft: ck('outil_microsoft'), stripe: ck('outil_stripe'), mailchimp: ck('outil_mailchimp'), crm: ck('outil_crm'), compta: ck('outil_compta'), rh: ck('outil_rh'), analytics: ck('outil_analytics'), cloud: ck('outil_cloud'), video: ck('outil_video'), autres: v('outilsAutres') },
+    hasDpo: document.getElementById('dpoOui').checked,
+    dpoNom: v('dpoNom'), dpoEmail: v('dpoEmail'),
+    treatmentData,
+    securite: {
+      mdp: ck('sec_mdp'), antivirus: ck('sec_antivirus'), chiffrement: ck('sec_chiffrement'),
+      acces: ck('sec_acces'), sauvegardes: ck('sec_sauvegardes'), formation: ck('sec_formation'), contrats: ck('sec_contrats')
+    }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'RGPD_' + (info.raisonSociale || 'dossier').replace(/[^a-zA-Z0-9]/g, '_') + '_' + formatDateFile(new Date()) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function loadProject(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      setVal('raisonSociale', data.raisonSociale);
+      setVal('siret', data.siret);
+      setSelectVal('formeJuridique', data.formeJuridique);
+      setSelectVal('secteur', data.secteur);
+      setVal('adresse', data.adresse);
+      setVal('responsableLegal', data.responsableLegal);
+      setVal('emailRGPD', data.emailRGPD);
+      if (data.outils) {
+        setCk('outil_google', data.outils.google); setCk('outil_microsoft', data.outils.microsoft);
+        setCk('outil_stripe', data.outils.stripe); setCk('outil_mailchimp', data.outils.mailchimp);
+        setCk('outil_crm', data.outils.crm); setCk('outil_compta', data.outils.compta);
+        setCk('outil_rh', data.outils.rh); setCk('outil_analytics', data.outils.analytics);
+        setCk('outil_cloud', data.outils.cloud); setCk('outil_video', data.outils.video);
+        setVal('outilsAutres', data.outils.autres);
+      }
+      if (data.hasDpo) {
+        document.getElementById('dpoOui').checked = true;
+        toggleDpo();
+      }
+      setVal('dpoNom', data.dpoNom);
+      setVal('dpoEmail', data.dpoEmail);
+      if (data.treatmentData) treatmentData = data.treatmentData;
+      if (data.securite) {
+        setCk('sec_mdp', data.securite.mdp);
+        setCk('sec_antivirus', data.securite.antivirus);
+        setCk('sec_chiffrement', data.securite.chiffrement);
+        setCk('sec_acces', data.securite.acces);
+        setCk('sec_sauvegardes', data.securite.sauvegardes);
+        setCk('sec_formation', data.securite.formation);
+        setCk('sec_contrats', data.securite.contrats);
+      }
+      if (data.secteur) onSecteurChange(data.secteur);
+      // Restaurer le résumé entreprise
+      if (data.raisonSociale) {
+        document.getElementById('cs_nom').textContent = data.raisonSociale;
+        document.getElementById('cs_details').textContent = [
+          data.siret ? 'SIRET : ' + data.siret : '',
+          data.adresse || ''
+        ].filter(Boolean).join(' · ');
+        document.getElementById('companySummary').style.display = 'block';
+        document.getElementById('manualCompanyFields').style.display = 'none';
+      }
+      // Réinitialiser l'input pour permettre de recharger le même fichier
+      input.value = '';
+    } catch(err) {
+      alert('Fichier invalide ou corrompu.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function resetForm() {
+  if (!confirm('Recommencer depuis le début ?')) return;
+  location.reload();
+}
+
+// ==================== DPO ====================
+const DPO_REQUIRED_SECTORS = ['sante', 'securite', 'administration', 'finance'];
+
+function checkDpoRequired() {
+  const secteur = document.getElementById('secteur').value;
+  const required = DPO_REQUIRED_SECTORS.includes(secteur);
+  const msgEl = document.getElementById('dpoRequiredMsg');
+  const dpoCard = document.getElementById('dpoCard');
+  if (dpoCard) dpoCard.style.display = 'block';
+  if (msgEl) {
+    if (required) {
+      msgEl.style.color = '#c0392b';
+      msgEl.innerHTML = '⚠️ <strong>Obligatoire</strong> pour votre secteur (santé, sécurité, finance, administration).';
+    } else {
+      msgEl.style.color = '#888';
+      msgEl.innerHTML = 'Facultatif pour votre secteur.';
+    }
+  }
+  return required;
+}
+
+function toggleDpo() {
+  const show = document.getElementById('dpoOui').checked;
+  document.getElementById('dpoFields').style.display = show ? 'grid' : 'none';
+}
+
+// ==================== UTILS ====================
+function v(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+function ck(id) { const el = document.getElementById(id); return el ? el.checked : false; }
+function setVal(id, val) { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; }
+function setCk(id, val) { const el = document.getElementById(id); if (el && val !== undefined) el.checked = val; }
+function setSelectVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el || val === undefined || val === null) return;
+  const normalized = String(val).trim().toLowerCase();
+  // 1. Essai direct
+  el.value = val;
+  if (el.value === val) return;
+  // 2. Recherche insensible à la casse et aux accents
+  for (const opt of el.options) {
+    if (opt.value.trim().toLowerCase() === normalized) {
+      el.value = opt.value;
+      return;
+    }
+  }
+}
+
+function escHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) { return escHtml(s); }
+
+function formatDate(d) {
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function formatDateFile(d) {
+  return d.toISOString().slice(0,10);
+}
+
+function getSecMesures(sec) {
+  const map = {
+    mdp: 'Mots de passe forts', antivirus: 'Antivirus/pare-feu', chiffrement: 'Chiffrement',
+    acces: 'Accès restreints par rôle', sauvegardes: 'Sauvegardes régulières',
+    formation: 'Formation des employés', contrats: 'Contrats sous-traitance RGPD'
+  };
+  return Object.entries(sec).filter(([,v])=>v).map(([k])=>map[k]).join(', ') || 'Aucune mesure renseignée';
+}
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+  // DPO : masqué par défaut, carte DPO masquée jusqu'à sélection secteur
+  document.getElementById('dpoFields').style.display = 'none';
+  document.getElementById('dpoCard').style.display = 'none';
+
+  // Search input
+  document.getElementById('searchInput').addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    const q = this.value.trim();
+    if (q.length < 3) { document.getElementById('suggestions').innerHTML = ''; return; }
+    debounceTimer = setTimeout(() => searchEntreprises(q), 400);
+  });
+
+  // Si pas de résultat trouvé après frappe, proposer saisie manuelle
+  document.getElementById('searchInput').addEventListener('blur', function() {
+    setTimeout(() => {
+      const summary = document.getElementById('companySummary');
+      const manual = document.getElementById('manualCompanyFields');
+      const raisonVal = document.getElementById('raisonSociale').value.trim();
+      if (!raisonVal && this.value.trim().length > 0) {
+        manual.style.display = 'block';
+      }
+    }, 300);
+  });
+
+  // Close suggestions on outside click
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrapper')) {
+      document.getElementById('suggestions').innerHTML = '';
+    }
+  });
+});
+</script>
+</body>
+</html>
