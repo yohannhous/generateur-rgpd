@@ -647,17 +647,16 @@ let apiAvailable = true;
 let debounceTimer = null;
 let claudeApiKey = '';
 
-// Sur Vercel (HTTPS, pas localhost) → proxy /api/claude
-// En local → appel direct Anthropic avec header browser
 function getClaudeUrl() {
-  const isVercel = location.protocol === 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
-  return isVercel ? '/api/claude' : 'https://api.anthropic.com/v1/messages';
+  return 'https://api.anthropic.com/v1/messages';
 }
 function getClaudeHeaders(key) {
-  const isVercel = location.protocol === 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
-  const h = { 'x-api-key': key, 'content-type': 'application/json' };
-  if (!isVercel) { h['anthropic-version'] = '2023-06-01'; h['anthropic-dangerous-allow-browser'] = 'true'; }
-  return h;
+  return {
+    'x-api-key': key,
+    'anthropic-version': '2023-06-01',
+    'content-type': 'application/json',
+    'anthropic-dangerous-allow-browser': 'true'
+  };
 }
 let claudeApiValid = false;
 
