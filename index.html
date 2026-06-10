@@ -646,6 +646,19 @@ let treatmentData = {};
 let apiAvailable = true;
 let debounceTimer = null;
 let claudeApiKey = '';
+
+// Sur Vercel (HTTPS, pas localhost) → proxy /api/claude
+// En local → appel direct Anthropic avec header browser
+function getClaudeUrl() {
+  const isVercel = location.protocol === 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+  return isVercel ? '/api/claude' : 'https://api.anthropic.com/v1/messages';
+}
+function getClaudeHeaders(key) {
+  const isVercel = location.protocol === 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+  const h = { 'x-api-key': key, 'content-type': 'application/json' };
+  if (!isVercel) { h['anthropic-version'] = '2023-06-01'; h['anthropic-dangerous-allow-browser'] = 'true'; }
+  return h;
+}
 let claudeApiValid = false;
 
 // ==================== SUGGESTIONS PAR CHAMP ====================
@@ -722,12 +735,9 @@ async function testApiKey() {
   status.textContent = '⏳ Test en cours...';
   status.style.display = 'inline-flex';
   try {
-    const resp = await fetch('/api/claude', {
+    const resp = await fetch(getClaudeUrl(), {
       method: 'POST',
-      headers: {
-        'x-api-key': key,
-        'content-type': 'application/json',
-      },
+      headers: getClaudeHeaders(key),
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 10,
@@ -797,12 +807,9 @@ ${fieldInstruction}`;
   btnEl.textContent = '⏳ Génération...';
 
   try {
-    const resp = await fetch('/api/claude', {
+    const resp = await fetch(getClaudeUrl(), {
       method: 'POST',
-      headers: {
-        'x-api-key': claudeApiKey,
-        'content-type': 'application/json',
-      },
+      headers: getClaudeHeaders(claudeApiKey),
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
