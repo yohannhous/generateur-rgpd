@@ -372,6 +372,14 @@
         <input type="email" id="emailRGPD" placeholder="rgpd@exemple.fr">
         <div class="error-msg hidden" id="err_emailRGPD">Email invalide</div>
       </div>
+      <div class="field">
+        <label>Hébergeur du site web <span style="font-size:.8rem;color:var(--gray-text)">(obligatoire mentions légales)</span></label>
+        <input type="text" id="hebergeur" placeholder="Ex : OVH SAS — 2 rue Kellermann — 59100 Roubaix">
+      </div>
+      <div class="field">
+        <label>Capital social <span style="font-size:.8rem;color:var(--gray-text)">(obligatoire pour SARL/SAS/SA)</span></label>
+        <input type="text" id="capitalSocial" placeholder="Ex : 10 000 €">
+      </div>
     </div>
   </div>
 
@@ -1489,6 +1497,8 @@ function getFormData() {
     emailRGPD: v('emailRGPD'),
     outilsAmericains: document.getElementById('outil_google')?.checked || document.getElementById('outil_microsoft')?.checked || document.getElementById('outil_stripe')?.checked || document.getElementById('outil_mailchimp')?.checked || document.getElementById('outil_crm')?.checked || document.getElementById('outil_analytics')?.checked || false,
     outilsListe: getOutilsListe(),
+    hebergeur: v('hebergeur'),
+    capitalSocial: v('capitalSocial'),
     hasDpo: dpoOui,
     dpoNom: v('dpoNom'),
     dpoEmail: v('dpoEmail'),
@@ -1504,6 +1514,7 @@ function genDoc1(info, today) {
     const fiche = CNIL_FICHES[id] || {};
     const label = TREATMENTS_LIST.find(t=>t.id===id)?.label || id;
     const sec = getSecMesures(info.securite);
+    const soustraitants = escHtml(d.sous_traitants?.value || fiche.sous_traitants_types || '');
     return `<tr>
       <td><strong>${escHtml(fiche.nom || label)}</strong></td>
       <td>${escHtml(info.raisonSociale)}<br><small>${escHtml(info.responsableLegal)}</small></td>
@@ -1512,6 +1523,7 @@ function genDoc1(info, today) {
       <td>${escHtml(d.personnes_concernees?.value || fiche.personnes_concernees || '')}</td>
       <td>${escHtml(d.categories_donnees?.value || fiche.categories_donnees || '')}</td>
       <td>${escHtml(d.destinataires?.value || fiche.destinataires || '')}</td>
+      <td>${soustraitants || '<em style="color:var(--gray-text)">Aucun</em>'}</td>
       <td>${(d.transfert_hors_ue?.value||'non')==='oui' ? '🌍 Oui — ' + escHtml(d.transfert_detail?.value||'') : '🇪🇺 Non'}</td>
       <td>${escHtml(d.duree_conservation?.value || fiche.duree_conservation || '')}</td>
       <td>${escHtml(sec)}</td>
@@ -1533,9 +1545,9 @@ function genDoc1(info, today) {
         <thead><tr>
           <th>Traitement</th><th>Responsable</th><th>Finalité</th><th>Base légale</th>
           <th>Personnes concernées</th><th>Catégories de données</th><th>Destinataires</th>
-          <th>Transfert hors UE</th><th>Durée de conservation</th><th>Mesures de sécurité</th>
+          <th>Sous-traitants (Art. 30)</th><th>Transfert hors UE</th><th>Durée de conservation</th><th>Mesures de sécurité</th>
         </tr></thead>
-        <tbody>${rows || '<tr><td colspan="10" style="text-align:center;color:var(--gray-text)">Aucun traitement sélectionné</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="11" style="text-align:center;color:var(--gray-text)">Aucun traitement sélectionné</td></tr>'}</tbody>
       </table>
     </div>
   </div>`;
@@ -1572,29 +1584,49 @@ ${info.hasDpo ? `<br>Délégué à la Protection des Données (DPO) : ${escHtml(
 <p>Nous collectons et traitons des données personnelles dans le cadre des activités suivantes :</p>
 ${traitementsList || '<p>Aucun traitement renseigné.</p>'}
 
-<h4>3. Vos droits</h4>
+<h4>3. Transferts hors Union européenne</h4>
+${(() => {
+  const hasTransfert = Object.values(treatmentData).some(d => (d.transfert_hors_ue?.value||'non')==='oui');
+  if (!hasTransfert) return '<p>Vos données personnelles sont traitées au sein de l\'Union européenne et ne font l\'objet d\'aucun transfert vers des pays tiers.</p>';
+  const details = Object.entries(treatmentData)
+    .filter(([,d]) => (d.transfert_hors_ue?.value||'non')==='oui')
+    .map(([id,d]) => {
+      const fiche = CNIL_FICHES[id]||{};
+      const label = TREATMENTS_LIST.find(t=>t.id===id)?.label||id;
+      return `<li>${escHtml(fiche.nom||label)} : ${escHtml(d.transfert_detail?.value||fiche.transfert_detail||'')}</li>`;
+    }).join('');
+  return `<p>Certains de vos traitements impliquent des transferts de données vers des pays situés en dehors de l'Union européenne :</p><ul>${details}</ul><p>Ces transferts sont encadrés par des garanties appropriées conformément au Chapitre V du RGPD (clauses contractuelles types approuvées par la Commission européenne ou décision d'adéquation).</p>`;
+})()}
+
+<h4>4. Vos droits</h4>
 <p>Conformément au RGPD (Règlement UE 2016/679) et à la loi Informatique et Libertés, vous disposez des droits suivants :</p>
 <ul>
-<li><strong>Droit d'accès</strong> : obtenir une copie des données vous concernant</li>
-<li><strong>Droit de rectification</strong> : corriger des données inexactes ou incomplètes</li>
-<li><strong>Droit à l'effacement</strong> : demander la suppression de vos données ("droit à l'oubli")</li>
-<li><strong>Droit à la portabilité</strong> : recevoir vos données dans un format structuré</li>
-<li><strong>Droit d'opposition</strong> : vous opposer à certains traitements, notamment la prospection</li>
-<li><strong>Droit à la limitation</strong> : demander la suspension d'un traitement</li>
+<li><strong>Droit d'accès</strong> (Art. 15) : obtenir une copie des données vous concernant</li>
+<li><strong>Droit de rectification</strong> (Art. 16) : corriger des données inexactes ou incomplètes</li>
+<li><strong>Droit à l'effacement</strong> (Art. 17) : demander la suppression de vos données ("droit à l'oubli")</li>
+<li><strong>Droit à la portabilité</strong> (Art. 20) : recevoir vos données dans un format structuré</li>
+<li><strong>Droit d'opposition</strong> (Art. 21) : vous opposer à certains traitements, notamment la prospection commerciale</li>
+<li><strong>Droit à la limitation</strong> (Art. 18) : demander la suspension temporaire d'un traitement</li>
+<li><strong>Droit de retrait du consentement</strong> (Art. 7.3) : retirer votre consentement à tout moment, sans que cela remette en cause la licéité du traitement effectué avant ce retrait</li>
+<li><strong>Droit de définir des directives post-mortem</strong> : définir le sort de vos données après votre décès (loi Informatique et Libertés, Art. 85)</li>
 </ul>
 
-<h4>4. Exercer vos droits</h4>
+<h4>5. Exercer vos droits</h4>
 <p>Pour exercer vos droits, contactez-nous à : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a> ${contactDpo}<br>
-Nous nous engageons à répondre dans un délai d'un mois à compter de la réception de votre demande.</p>
+Merci de joindre une copie d'un justificatif d'identité à votre demande.<br>
+Nous nous engageons à répondre dans un délai d'un mois à compter de la réception de votre demande (délai pouvant être prolongé de deux mois en cas de demande complexe).</p>
 
-<h4>5. Réclamation auprès de la CNIL</h4>
+<h4>6. Réclamation auprès de la CNIL</h4>
 <p>Si vous estimez que vos droits ne sont pas respectés, vous avez le droit d'introduire une réclamation auprès de la Commission Nationale de l'Informatique et des Libertés (CNIL) :<br>
 <a href="https://www.cnil.fr/fr/plaintes" target="_blank">www.cnil.fr/fr/plaintes</a><br>
 CNIL — 3 Place de Fontenoy — TSA 80715 — 75334 Paris Cedex 07<br>
 Tél. : 01 53 73 22 22</p>
 
-<h4>6. Sécurité</h4>
-<p>Nous mettons en œuvre les mesures techniques et organisationnelles appropriées pour assurer la sécurité de vos données : ${escHtml(getSecMesures(info.securite))}.</p>`;
+<h4>7. Sécurité</h4>
+<p>Nous mettons en œuvre les mesures techniques et organisationnelles appropriées pour assurer la sécurité de vos données : ${escHtml(getSecMesures(info.securite))}.</p>
+
+${info.outilsAmericains ? `<h4>8. Cookies et traceurs</h4>
+<p>Notre site utilise des traceurs (cookies) déposés par des services tiers (${escHtml(info.outilsListe)}). Ces traceurs peuvent collecter des données à des fins de mesure d'audience, de publicité ou de fonctionnement du service. Conformément à la recommandation de la CNIL du 17 septembre 2020, votre consentement est requis avant tout dépôt de cookie non essentiel. Vous pouvez retirer votre consentement à tout moment via notre gestionnaire de cookies.</p>` : ''}`;
 
   return `<div class="doc-section">
     <div class="doc-header">
@@ -1646,8 +1678,29 @@ Pour toute question : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info
 Cordialement,<br>${escHtml(info.responsableLegal)}<br>${escHtml(info.raisonSociale)}
 </blockquote>
 
-<h4>5. Registre interne des violations</h4>
-<p>Toute violation, même non notifiée à la CNIL, doit être consignée en interne avec : date, description, données concernées, mesures prises, décision de notification ou non + justification.</p>`;
+<h4>5. Cas d'exemption de notification à la CNIL</h4>
+<p>La notification à la CNIL n'est <strong>pas obligatoire</strong> si la violation n'est pas susceptible d'engendrer un risque pour les droits et libertés des personnes (Art. 33.1 RGPD). Exemples :</p>
+<ul>
+<li>Données correctement chiffrées dont la clé n'a pas été compromise</li>
+<li>Données supprimées de manière sécurisée sans accès non autorisé préalable</li>
+<li>Perte d'un document papier ne contenant que des données non sensibles, récupéré immédiatement</li>
+</ul>
+<p>⚠️ Même en cas d'exemption, la violation doit être consignée dans le registre interne.</p>
+
+<h4>6. Registre interne des violations (obligatoire — Art. 33.5 RGPD)</h4>
+<p>Toute violation doit être consignée, même si elle n'est pas notifiée à la CNIL. Ce registre doit être tenu à disposition de la CNIL en cas de contrôle.</p>
+<table class="doc-table" style="font-size:.8rem">
+  <thead><tr>
+    <th>N°</th><th>Date constatation</th><th>Nature de la violation</th><th>Données concernées</th>
+    <th>Nb personnes</th><th>Risque évalué</th><th>Notifié CNIL ?</th><th>Notifié personnes ?</th>
+    <th>Mesures prises</th><th>Responsable</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>001</td><td>JJ/MM/AAAA</td><td>[Ransomware / Accès non autorisé / Envoi erroné / …]</td><td>[Types de données]</td><td>[Nombre]</td><td>⬜ Faible &nbsp; ⬜ Élevé</td><td>⬜ Oui &nbsp; ⬜ Non</td><td>⬜ Oui &nbsp; ⬜ Non &nbsp; ⬜ N/A</td><td>[Actions correctives]</td><td>[Prénom Nom]</td></tr>
+    <tr><td>002</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  </tbody>
+</table>
+<p style="font-size:.8rem;color:var(--gray-text);margin-top:.5rem">📌 Conservez ce registre au moins 3 ans. Joignez les preuves : captures d'écran, échanges d'emails, rapports techniques.</p>`;
 
   return `<div class="doc-section">
     <div class="doc-header">
@@ -1673,10 +1726,14 @@ function genDoc4(info, today) {
 <h4>Informations légales</h4>
 <p><strong>Éditeur du site :</strong> ${escHtml(info.raisonSociale)} — ${escHtml(info.formeJuridique)}<br>
 <strong>SIRET :</strong> ${escHtml(info.siret)}<br>
+${info.capitalSocial ? `<strong>Capital social :</strong> ${escHtml(info.capitalSocial)}<br>` : ''}
 <strong>Siège social :</strong> ${escHtml(info.adresse)}<br>
 <strong>Représentant légal :</strong> ${escHtml(info.responsableLegal)}<br>
 <strong>Contact :</strong> <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a>
 ${info.hasDpo ? `<br><strong>DPO :</strong> ${escHtml(info.dpoNom)} — <a href="mailto:${escHtml(info.dpoEmail)}">${escHtml(info.dpoEmail)}</a>` : ''}</p>
+
+<h4>Hébergement</h4>
+<p><strong>Hébergeur :</strong> ${escHtml(info.hebergeur) || '<span style="color:#DC2626">[À COMPLÉTER — obligatoire loi LCEN art. 6]</span>'}</p>
 
 <h4>Protection des données personnelles</h4>
 <p>${escHtml(info.raisonSociale)} collecte et traite des données personnelles conformément au Règlement (UE) 2016/679 (RGPD) et à la loi n°78-17 du 6 janvier 1978 modifiée.</p>
@@ -1684,19 +1741,24 @@ ${info.hasDpo ? `<br><strong>DPO :</strong> ${escHtml(info.dpoNom)} — <a href=
 <ul>${traitements || '<li>Aucun traitement renseigné</li>'}</ul>
 
 <h4>Vos droits</h4>
-<p>Conformément au RGPD, vous disposez d'un droit d'accès, de rectification, d'effacement, de portabilité, de limitation et d'opposition concernant vos données personnelles.</p>
+<p>Conformément au RGPD, vous disposez d'un droit d'accès, de rectification, d'effacement, de portabilité, de limitation, d'opposition et de <strong>retrait du consentement</strong> concernant vos données personnelles.</p>
 <p>Pour exercer ces droits : <a href="mailto:${escHtml(info.emailRGPD)}">${escHtml(info.emailRGPD)}</a>${info.hasDpo ? ` ou ${escHtml(info.dpoEmail)}` : ''}</p>
 <p>Vous avez également le droit d'introduire une réclamation auprès de la <a href="https://www.cnil.fr/fr/plaintes" target="_blank">CNIL</a>.</p>
 <p><a href="#">Consulter notre politique de confidentialité complète →</a></p>
 </div>
 
 <h4>Code HTML à copier sur votre site</h4>
-<pre style="background:#1F2937;color:#F9FAFB;padding:1rem;border-radius:.5rem;font-size:.75rem;line-height:1.6;white-space:pre-wrap;word-break:break-all">&lt;section id="mentions-rgpd"&gt;
-  &lt;h2&gt;Informations légales&lt;/h2&gt;
-  &lt;p&gt;&lt;strong&gt;Éditeur :&lt;/strong&gt; ${escHtml(info.raisonSociale)} — SIRET : ${escHtml(info.siret)}&lt;/p&gt;
-  &lt;p&gt;&lt;strong&gt;Responsable :&lt;/strong&gt; ${escHtml(info.responsableLegal)} — &lt;a href="mailto:${escHtml(info.emailRGPD)}"&gt;${escHtml(info.emailRGPD)}&lt;/a&gt;&lt;/p&gt;
+<pre style="background:#1F2937;color:#F9FAFB;padding:1rem;border-radius:.5rem;font-size:.75rem;line-height:1.6;white-space:pre-wrap;word-break:break-all">&lt;section id="mentions-legales"&gt;
+  &lt;h2&gt;Mentions légales&lt;/h2&gt;
+  &lt;p&gt;&lt;strong&gt;Éditeur :&lt;/strong&gt; ${escHtml(info.raisonSociale)} (${escHtml(info.formeJuridique)}) — SIRET : ${escHtml(info.siret)}${info.capitalSocial ? ` — Capital : ${escHtml(info.capitalSocial)}` : ''}&lt;/p&gt;
+  &lt;p&gt;&lt;strong&gt;Siège social :&lt;/strong&gt; ${escHtml(info.adresse)}&lt;/p&gt;
+  &lt;p&gt;&lt;strong&gt;Responsable de la publication :&lt;/strong&gt; ${escHtml(info.responsableLegal)}&lt;/p&gt;
+  &lt;p&gt;&lt;strong&gt;Contact :&lt;/strong&gt; &lt;a href="mailto:${escHtml(info.emailRGPD)}"&gt;${escHtml(info.emailRGPD)}&lt;/a&gt;&lt;/p&gt;
+  &lt;p&gt;&lt;strong&gt;Hébergeur :&lt;/strong&gt; ${escHtml(info.hebergeur) || '[NOM HÉBERGEUR — ADRESSE — CODE POSTAL VILLE]'}&lt;/p&gt;
+  ${info.hasDpo ? `&lt;p&gt;&lt;strong&gt;DPO :&lt;/strong&gt; ${escHtml(info.dpoNom)} — &lt;a href="mailto:${escHtml(info.dpoEmail)}"&gt;${escHtml(info.dpoEmail)}&lt;/a&gt;&lt;/p&gt;` : ''}
   &lt;h3&gt;Vos droits RGPD&lt;/h3&gt;
-  &lt;p&gt;Accès, rectification, effacement, portabilité, opposition : &lt;a href="mailto:${escHtml(info.emailRGPD)}"&gt;${escHtml(info.emailRGPD)}&lt;/a&gt;&lt;/p&gt;
+  &lt;p&gt;Accès, rectification, effacement, portabilité, opposition, limitation, retrait du consentement :&lt;br&gt;
+  &lt;a href="mailto:${escHtml(info.emailRGPD)}"&gt;${escHtml(info.emailRGPD)}&lt;/a&gt;&lt;/p&gt;
   &lt;p&gt;Réclamation CNIL : &lt;a href="https://www.cnil.fr/fr/plaintes"&gt;cnil.fr/fr/plaintes&lt;/a&gt;&lt;/p&gt;
 &lt;/section&gt;</pre>`;
 
